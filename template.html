@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSockets Echo Demo</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div id="wrapper">
+        <!-- headers -->
+        <h1>WebSockets Echo Demo</h1>
+        <button type="submit" id="open_ws">Open WS</button>
+        <div id="status">Status: Not connected</div>
+        <div id="server_response"></div>
+        <!-- message table -->
+        <ul id="table"></ul>
+        <!-- form -->
+        <form id="form">
+            <textarea id="message" placeholder="Write your message here..." required></textarea>
+            <button type="submit">Send Message</button>
+            <button type="button" id="close_ws">Close Connection</button>
+            <button type="button" id="populate">Populate</button>
+        </form>
+    </div>
+
+    <script>
+        const config = {
+            URL: 'ws://127.0.0.1:4000'
+        };
+
+        let open_ws_btn = document.getElementById("open_ws");
+        let close_ws_btn = document.getElementById("close_ws");
+        let populate_btn = document.getElementById("populate");
+        let form = document.getElementById("form");
+        let server_response = document.getElementById("server_response");
+        let socketStatus = document.getElementById("status");
+        let table = document.getElementsByTagName("ul")[0];
+        let message = document.getElementById("message");
+        let text = "A".repeat(150000);
+
+        open_ws_btn.addEventListener("click", () => {
+            // disable the open button
+            open_ws_btn.disabled = true;
+            open_ws_btn.style.background = "gray";
+            open_ws_btn.style.pointerEvents = "none";
+            open_ws_btn.textContent = "Button Disabled";
+            // update status
+            socketStatus.innerHTML = "Connecting...";
+            // create websocket
+            let socket = new WebSocket(config.URL);
+
+            socket.onopen = (openEvent) => {
+                console.log("SOCKET CONNECTING STATUS IS: " + socket.readyState);
+                table.innerHTML = "";
+                server_response.innerHTML = "";
+                // provide client-side feedback
+                console.log("SOCKET CONNECTING STATUS IS: " + socket.readyState);
+                socketStatus.innerHTML = `Connected to: ${openEvent.currentTarget.url}`;
+                socketStatus.className = "open";
+                form.className = "show"; // you can also use classList API
+                populate_btn.addEventListener('click', () => {
+                    message.value = text;
+                });
+            }
+
+            socket.onmessage = function(messageEvent) {
+                    console.log(socket);
+                    console.log(messageEvent);
+
+                    // check if the received data is a blob
+                    if(messageEvent.data instanceof Blob) {
+
+                        // create a reader for the stream
+                        const reader = new FileReader();
+
+                        // read the Blob as text
+                        reader.readAsText(messageEvent.data);
+
+                        // when the Blob has succesfully been read, listen for the onload event
+                        reader.onload = function(e) {
+                            const msg = e.target.result; // this will contain the Blob content as text
+                            // insert the data into our HTML table
+                            table.innerHTML += '<li><span>Received:</span>' + msg + '</li>';
+                            message.placeholder = `(Previous message size: ${msg.length})`;
+                        };
+
+                    } else {
+                        console.log("received non-Blob data: ", messageEvent.data);
+                    }; 
+                };
+
+                // CLOSE EVENT
+                socket.onclose = (closeEventObject) => {
+                    console.log("CLOSE EVENT FIRED. CLOSE OBJECT", closeEventObject);
+                    // let's style our closure text consistently across all scenarios
+                    socketStatus.className = "closed";
+                    table.innerHTML = "";
+                    // using JavaScript's switch statement to improve our code 
+                    switch (closeEventObject.code) {
+                        case 1001: // if a peer (client or server) closes the connection immediately
+                            socketStatus.innerHTML = `Disconnected reason: ${closeEventObject.reason}`;
+                            table.innerHTML = "";
+                            break; 
+                        case 1002: // if a peer (client or server) does not adhere to the protocol spec
+                            socketStatus.innerHTML = `Disconnected reason: ${closeEventObject.reason}`;
+                            table.innerHTML = "";
+                            server_response.innerHTML = `The server responded: ${closeEventObject.reason}`;
+                            break; 
+                        case 1003: 
+                            socketStatus.innerHTML = `Unsupported data type.`;
+                            table.innerHTML = "";
+                            server_response.innerHTML = `The server responded: ${closeEventObject.reason}`;
+                            break; 
+                        case 1006: // network problem (e.g. your websocket server is not running)
+                            socketStatus.innerHTML = "Something is wrong with your WS newtork connection";
+                            break;
+                        case 1008: // server policy breached
+                            socketStatus.innerHTML = "You violated server policy.";
+                            server_response.innerHTML = `The server responded: ${closeEventObject.reason}`;
+                            break;
+                        case 1009: 
+                            socketStatus.innerHTML = `Data too long.`;
+                            table.innerHTML = "";
+                            server_response.innerHTML = `The server responded: ${closeEventObject.reason}`;
+                            break; 
+                        default: // when the client hits the close websocket button
+                            socketStatus.innerHTML = `You disconnected by clicking the Close button.`;
+                            server_response.innerHTML = `The server responded: ${closeEventObject.reason}`;
+                    }
+
+                    // FORM REMOVAL
+                    form.classList.remove("show");
+                    message.setAttribute("required", "true");
+                    // BUTTON styling. when button is clicked, diable its use. 
+                    open_ws_btn.disabled = false; 
+                    open_ws_btn.style.background = '';
+                    open_ws_btn.style.pointerEvents = '';
+                    open_ws_btn.textContent = "Open WS";
+                };
+
+                // ERROR EVENT
+                socket.onerror = (error) => {
+                    console.log("Error event was throgn. ERROR OBJECT: ", error);
+                    socketStatus.innerHTML = "Error.";
+                    socketStatus.className = "closed";
+                }
+
+                // *** SEND METHOD
+                form.addEventListener('submit', (e) => {
+                    e.preventDefault();
+
+                    if(socket.readyState === 1) {
+                        let user_text = message.value; 
+                        socket.send(user_text);
+                        // update our table
+                        table.innerHTML += '<li class="sent"><span>SENT:</span>' + user_text + '</li>';
+                        message.value = "";
+                    };
+                });
+
+                // *** CLOSE METHOD
+                close_ws_btn.addEventListener("click", () => {
+                    socketStatus.innerHTML = "closing ... please wait ..."
+                    socketStatus.classList.add('closing');
+                    // close the websocket connection
+                    socket.close(1000, "I don't like you");
+                    // styling
+                    message.removeAttribute("required");
+                    form.classList.remove("show");
+                });
+        });
+    </script>
+</body>
+
+</html>
