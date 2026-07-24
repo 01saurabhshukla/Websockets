@@ -2,9 +2,12 @@
   "name": "websocket_server",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "server/app.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server/app.js",
+    "dev": "node --watch server/app.js",
+    "client": "npx http-server -p 8000",
+    "test": "node --test server/tests/*.test.js"
   },
   "repository": {
     "type": "git",
