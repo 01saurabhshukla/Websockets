@@ -9,26 +9,27 @@ module.exports = {
 
     // Upgrade Constants
     METHOD: "GET",
-    VERSION: 13, 
+    VERSION: 13,
     CONNECTION: "upgrade",
     UPGRADE: "websocket",
     ALLOWED_ORIGINS: [
+        '*',
         'http://localhost:5500',
         'http://127.0.0.1:5500',
-        'null',
-        "http://127.0.0.1:8000"
+        'http://127.0.0.1:8000',
+        'null'
     ],
     GUID: "258EAFA5-E914-47DA-95CA-C5AB0DC85B11",
 
     // Frame Parsing
-    MIN_FRAME_SIZE: 2, 
+    MIN_FRAME_SIZE: 2,
     MASK_LENGTH: 4,
 
     SMALL_DATA_SIZE: 125,
     MEDIUM_DATA_SIZE: 65535,
     MEDIUM_DATA_FLAG: 126, // if payload header in WS frame (binary) is 01111110, or 126 (decimal), then the following 2 bytes represent the actual payload length
     LARGE_DATA_FLAG: 127, // if payload header in WS frame (binary) is 01111111, or 127 (decimal), then the following 8 bytes represent the actual payload length
-    MEDIUM_SIZE_CONSUMPTION: 2, 
+    MEDIUM_SIZE_CONSUMPTION: 2,
     LARGE_SIZE_CONSUMPTION: 8,
 
     // *** WEBSOCKET OPCODES

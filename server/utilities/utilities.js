@@ -1,9 +1,15 @@
 const CONSTANTS = require('../config/constants');
 const crypto = require('crypto');
 
+// function isOriginAllowed(origin){
+//     return CONSTANTS.ALLOWED_ORIGINS.includes(origin);
+// }
+
 function isOriginAllowed(origin){
+    if (CONSTANTS.ALLOWED_ORIGINS.includes('*')) return true;
     return CONSTANTS.ALLOWED_ORIGINS.includes(origin);
 }
+
 
 function check(socket, upgradeHeaderCheck, connectionHeaderCheck, methodCheck, originCheck) {
     console.log("Headers", upgradeHeaderCheck, connectionHeaderCheck, methodCheck, originCheck);

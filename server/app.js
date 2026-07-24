@@ -54,14 +54,22 @@ function startWebSocketConnection(socket){
     console.log(`WS CONNECTION ESTABLISHED WITH CLIENT PORT: ${socket.remotePort}`);
     const receiver = new WebSocketReceiver(socket);
 
+    receiver.startHeartbeat();
+
     socket.on('data', (chunk) => {
         receiver.processBuffer(chunk);
     })
 
     socket.on('end', () => {
         console.log('Closing Connection...');
+        receiver.stopHeartbeat();
+    });
+
+    socket.on('close', () => {
+        receiver.stopHeartbeat();
     });
 }
+
 
 class WebSocketReceiver {
 
@@ -76,6 +84,7 @@ class WebSocketReceiver {
     _task = GET_INFO;
     _fin = false; // Indicates if the final fragment of a message has been received.
     _opcode = null; // Opcode representing the type of received data.
+    _messageOpcode = null; // Opcode of the first frame in a message (text vs binary).
     _masked = false; // Indicates whether the received frame is masked.
     _initialPayloadSizeIndicator = 0; // Size indicator for the payload being processed.
     _framePayloadLength = 0; // length of one WebSocket frame received
@@ -84,6 +93,8 @@ class WebSocketReceiver {
     _mask = Buffer.alloc(CONSTANTS.MASK_LENGTH); // this will hold the masking key set and sent by the client
     _framesReceived = 0; // tally of how many frames have been received related to our websocket message
     _fragments = []; // store fragments (frames) for reassembly 
+    _isAlive = true;
+    _heartbeatTimer = null;
 
     processBuffer(chunk) {
         this._buffersArray.push(chunk);
@@ -132,20 +143,27 @@ class WebSocketReceiver {
 
         this._fin = (firstByte & 0b10000000) === 0b10000000;
         this._opcode = (firstByte & 0b00001111);
+
+        if (this._opcode !== 0x00 && this._messageOpcode === null) {
+            this._messageOpcode = this._opcode;
+        }
         this._masked = (secondByte & 0b10000000) === 0b10000000;
         this._initialPayloadSizeIndicator = secondByte & 0b01111111;    
         
         if(!this._masked) {
             // end the socket connection and send a close frame
             this._sendClose(1002, "MASK must be set.");
+            return; // stop — _sendClose already reset state and closed socket
         };
 
         // **** PING AND PONG FRAMES
-        if([CONSTANTS.OPCODE_PING, CONSTANTS.OPCODE_PONG].includes(this._opcode)) {
-            // send a close frame and close the underlying WS connection
-            this._sendClose(1003, "The server does not accept ping or pong frames."); // unsupported data
-        };
+        // if([CONSTANTS.OPCODE_PING, CONSTANTS.OPCODE_PONG].includes(this._opcode)) {
+        //     // send a close frame and close the underlying WS connection
+        //     this._sendClose(1003, "The server does not accept ping or pong frames.");
+        //     return; // stop — prevents falling through to this._task = GET_LENGTH
+        // };
 
+        // 
         this._task = GET_LENGTH;
     } // *end Get Info
 
@@ -199,7 +217,22 @@ class WebSocketReceiver {
          // push decoded / unmasked data into our fragments array
         if(frame_unmasked_payload_buffer.length) {
             this._fragments.push(frame_unmasked_payload_buffer);
-        };
+        }
+
+        // **** PING FRAME RECEIVED (e.g. from non-browser client)
+        if (this._opcode === CONSTANTS.OPCODE_PING) {
+            console.log("Received PING Frame! Replying with PONG...");
+            this._sendPong(frame_unmasked_payload_buffer);
+            return;
+        }
+
+        // **** PONG FRAME RECEIVED (Browser replied to our 30s Ping)
+        if (this._opcode === CONSTANTS.OPCODE_PONG) {
+            console.log("Received PONG response Frame! Connection is Alive.");
+            this._isAlive = true;
+            this._reset();
+            return;
+        }
 
         // **** CLOSE FRAME WITH A PAYLOAD
         if(this._opcode === CONSTANTS.OPCODE_CLOSE) {
@@ -271,6 +304,7 @@ class WebSocketReceiver {
         this._task = GET_INFO;
         this._fin = false;                      // Indicates if the final fragment of a message has been received.
         this._opcode = null;                    // Opcode representing the type of received data.
+        this._messageOpcode = null;             // Reset initial message opcode.
         this._masked = false;                   // Indicates whether the received frame is masked.
         this._initialPayloadSizeIndicator = 0;  // Size indicator for the payload being processed.
         this._framePayloadLength = 0;           // length of one WebSocket frame received
@@ -308,7 +342,8 @@ class WebSocketReceiver {
         this._socket.write(closeFrame);
         this._socket.end(); // ending the TCP websocket connection in compliance with the RFC
 
-        // reset
+        // stop heartbeat timer and reset
+        this.stopHeartbeat();
         this._reset();
 
     }; // *end sendClose
@@ -344,7 +379,7 @@ class WebSocketReceiver {
         let rsv1 = 0x00;
         let rsv2 = 0x00;
         let rsv3 = 0x00;
-        let opcode = CONSTANTS.OPCODE_BINARY; 
+        let opcode = this._messageOpcode || CONSTANTS.OPCODE_BINARY; 
         // shift biwise operator - shift all bits to their correct positions
         let firstByte = (fin << 7) | (rsv1 << 6) | (rsv2 << 5) | (rsv3 << 4) | opcode;
         frame[0] = firstByte; // FIN, RSV, + OPCODE
@@ -398,5 +433,42 @@ class WebSocketReceiver {
         // send a closure frame with the close code and reason
         this._sendClose(closeCode, serverResponse);
     }; //*end getCloseInfo
+
+    startHeartbeat() {
+        this._isAlive = true;
+        this._heartbeatTimer = setInterval(() => {
+            if(this._isAlive === false){
+                console.log("Client missed HeartBeat response. Closing connection...");
+                return this._socket.destroy();
+            };
+
+            this._isAlive = false;
+            this._sendPing();
+        }, 30000);
+    } // end* setHeartbeat
+
+    stopHeartbeat() {
+        if(this._heartbeatTimer){
+            clearInterval(this._heartbeatTimer);
+            this._heartbeatTimer = null;
+        }
+    } // end* stopHeartbeat
+
+    _sendPing(){
+        const firstByte = 0x89;
+        const secondByte = 0x00;
+        this._socket.write(Buffer.from([firstByte, secondByte]));
+    }
+
+    _sendPong(payloadBuffer){
+        const len = payloadBuffer ? payloadBuffer.length : 0;
+        const firstByte = 0x8A;
+        const secondByte = len;
+        const header = Buffer.from([firstByte, secondByte]);
+        const frame = len > 0 ? Buffer.concat([header, payloadBuffer]) : header;
+
+        this._socket.write(frame);
+        this._reset();
+    }
 
 }
