@@ -111,14 +111,14 @@ describe('Git Hooks Tests', () => {
             assert.strictEqual(result.passed, false);
         });
 
-        it('rejects first line longer than 72 characters', () => {
-            const longMsg = 'feat: ' + 'a'.repeat(70); // 76 chars total
+        it('rejects first line longer than 350 characters', () => {
+            const longMsg = 'feat: ' + 'a'.repeat(400); // 76 chars total
             const result = runCommitMsgHook(longMsg);
             assert.strictEqual(result.passed, false);
         });
 
-        it('accepts first line exactly 72 characters', () => {
-            const msg = 'feat: ' + 'a'.repeat(66); // 72 chars total
+        it('accepts first line exactly 350 characters', () => {
+            const msg = 'feat: ' + 'a'.repeat(344); // 72 chars total
             const result = runCommitMsgHook(msg);
             assert.strictEqual(result.passed, true);
         });

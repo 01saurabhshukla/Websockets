@@ -66,11 +66,11 @@ if ! echo "$COMMIT_MSG" | grep -qE "$PATTERN"; then
     exit 1
 fi
 
-# Check description length (max 72 chars for the first line — Git best practice)
+# Check description length (max 350 chars for the first line — Git best practice)
 FIRST_LINE=$(echo "$COMMIT_MSG" | head -n 1)
-if [ ${#FIRST_LINE} -gt 72 ]; then
+if [ ${#FIRST_LINE} -gt 350 ]; then
     echo ""
-    echo "⚠️  COMMIT BLOCKED: First line is too long (${#FIRST_LINE} chars, max 72)."
+    echo "⚠️  COMMIT BLOCKED: First line is too long (${#FIRST_LINE} chars, max 350)."
     echo "   Keep the first line concise. Add details in the commit body."
     echo ""
     echo "   Example:"

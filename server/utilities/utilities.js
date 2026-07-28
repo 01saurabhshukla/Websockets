@@ -12,7 +12,6 @@ function isOriginAllowed(origin){
 
 
 function check(socket, upgradeHeaderCheck, connectionHeaderCheck, methodCheck, originCheck) {
-    console.log("Headers", upgradeHeaderCheck, connectionHeaderCheck, methodCheck, originCheck);
     if(upgradeHeaderCheck && connectionHeaderCheck && methodCheck && originCheck) {
         return true;
     } else {

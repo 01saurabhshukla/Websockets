@@ -9,13 +9,23 @@ describe('WebSocket Server Integration Tests', () => {
     let server;
     const TEST_PORT = 4005;
 
+    const activeSockets = new Set();
+
     before((_, done) => {
         server = http.createServer((req, res) => {
             res.writeHead(200);
             res.end('HTTP OK');
         });
 
+        server.on('connection', (socket) => {
+            activeSockets.add(socket);
+            socket.on('close', () => activeSockets.delete(socket));
+        });
+
         server.on('upgrade', (req, socket, head) => {
+            activeSockets.add(socket);
+            socket.on('close', () => activeSockets.delete(socket));
+
             const upgradeHeaderCheck = req.headers['upgrade'] && req.headers['upgrade'].toLowerCase() === CONSTANTS.UPGRADE;
             const connectionHeaderCheck = req.headers['connection'] && req.headers['connection'].toLowerCase() === CONSTANTS.CONNECTION;
             const methodCheck = req.method === CONSTANTS.METHOD;
@@ -36,6 +46,10 @@ describe('WebSocket Server Integration Tests', () => {
     });
 
     after((_, done) => {
+        for (const socket of activeSockets) {
+            socket.destroy();
+        }
+        activeSockets.clear();
         server.close(done);
     });
 
