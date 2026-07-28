@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Usage:
  *   Logger.info('Connection established', { port: 4000 });
