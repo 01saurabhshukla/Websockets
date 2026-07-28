@@ -1,0 +1,68 @@
+#!/bin/bash
+
+# ============================================================
+# PRE-PUSH HOOK
+# Prevents direct pushes to the main branch.
+# All changes must go through feature branches and be merged.
+#
+# Also runs tests one final time before pushing any branch.
+# ============================================================
+
+PROTECTED_BRANCH="main"
+CURRENT_BRANCH=$(git branch --show-current)
+
+# --- Rule 1: Block direct pushes to main ---
+# Check if we're pushing TO the protected branch
+while read local_ref local_sha remote_ref remote_sha; do
+    if echo "$remote_ref" | grep -qE "refs/heads/${PROTECTED_BRANCH}$"; then
+
+        # Allow pushes to main ONLY if the last commit is a merge/squash commit
+        # This means you merged a feature branch into main locally, which is fine
+        LAST_COMMIT_MSG=$(git log -1 --format="%s" "$local_sha" 2>/dev/null)
+        
+        # Check if current branch is main (direct push)
+        if [ "$CURRENT_BRANCH" = "$PROTECTED_BRANCH" ]; then
+            # Allow if last commit looks like a merge (squash merge or regular merge)
+            if echo "$LAST_COMMIT_MSG" | grep -qE "^Merge |^feat|^fix|^refactor|^chore|^docs|^test|^style|^perf|^ci|^build|^revert"; then
+                echo "✅ Pushing merge commit to main: \"$LAST_COMMIT_MSG\""
+            else
+                echo ""
+                echo "❌ PUSH BLOCKED: Direct push to '$PROTECTED_BRANCH' branch is not allowed!"
+                echo ""
+                echo "   Workflow:"
+                echo "   1. Create a feature branch:  git checkout -b feature/your-feature"
+                echo "   2. Make your changes and commit"
+                echo "   3. Switch to main:            git checkout main"
+                echo "   4. Merge:                     git merge --squash feature/your-feature"
+                echo "   5. Commit the merge:          git commit -m \"feat: your feature\""
+                echo "   6. Then push:                 git push origin main"
+                echo ""
+                echo "   To skip this check (NOT recommended): git push --no-verify"
+                echo ""
+                exit 1
+            fi
+        fi
+    fi
+done
+
+# --- Rule 2: Run tests before pushing any branch ---
+echo ""
+echo "🔍 Pre-push hook: Running tests before push..."
+echo "============================================"
+
+npm test 2>&1
+TEST_EXIT_CODE=$?
+
+if [ $TEST_EXIT_CODE -ne 0 ]; then
+    echo ""
+    echo "❌ PUSH BLOCKED: Tests failed!"
+    echo "   Fix the failing tests before pushing."
+    echo "   To skip this check (NOT recommended): git push --no-verify"
+    echo "============================================"
+    exit 1
+fi
+
+echo ""
+echo "✅ All tests passed. Proceeding with push."
+echo "============================================"
+exit 0

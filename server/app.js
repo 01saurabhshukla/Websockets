@@ -1,8 +1,54 @@
 const http = require('http');
 const CONSTANTS = require('./config/constants');
 const UTILITIES = require('./utilities/utilities');
+const Logger = require('./logger/Logger');
+const connectionRegistry = require('./connections/ConnectionsRegistry');
+const roomManager = require('./rooms/RoomManager');
+const MessageRouter = require('./handlers/MessageRouter');
 
-// defining our looping engine variables
+// Standalone function to construct and send RFC 6455 WebSocket frames to any socket
+function sendFrame(socket, message, opcode = CONSTANTS.OPCODE_TEXT) {
+    if (!socket || socket.destroyed) return;
+
+    const payload = Buffer.isBuffer(message) ? message : Buffer.from(String(message), 'utf8');
+    const payloadLength = payload.length;
+
+    let additionalPayloadSizeIndicator = 0;
+    if (payloadLength > CONSTANTS.SMALL_DATA_SIZE && payloadLength <= CONSTANTS.MEDIUM_DATA_SIZE) {
+        additionalPayloadSizeIndicator = CONSTANTS.MEDIUM_SIZE_CONSUMPTION;
+    } else if (payloadLength > CONSTANTS.MEDIUM_DATA_SIZE) {
+        additionalPayloadSizeIndicator = CONSTANTS.LARGE_SIZE_CONSUMPTION;
+    }
+
+    const frame = Buffer.alloc(CONSTANTS.MIN_FRAME_SIZE + additionalPayloadSizeIndicator + payloadLength);
+    
+    // FIN (1) + RSV (0) + Opcode
+    const firstByte = 0b10000000 | (opcode & 0x0f);
+    frame[0] = firstByte;
+
+    // Masking bit (0 for server to client)
+    const maskingBit = 0x00;
+
+    if (payloadLength <= CONSTANTS.SMALL_DATA_SIZE) {
+        frame[1] = (maskingBit | payloadLength);
+    } else if (payloadLength <= CONSTANTS.MEDIUM_DATA_SIZE) {
+        frame[1] = (maskingBit | CONSTANTS.MEDIUM_DATA_FLAG);
+        frame.writeUInt16BE(payloadLength, CONSTANTS.MIN_FRAME_SIZE);
+    } else {
+        frame[1] = (maskingBit | CONSTANTS.LARGE_DATA_FLAG);
+        frame.writeBigInt64BE(BigInt(payloadLength), CONSTANTS.MIN_FRAME_SIZE);
+    }
+
+    const startOffset = CONSTANTS.MIN_FRAME_SIZE + additionalPayloadSizeIndicator;
+    payload.copy(frame, startOffset);
+
+    socket.write(frame);
+}
+
+// Initialize MessageRouter with RoomManager, ConnectionRegistry, and sendFrame helper
+const messageRouter = new MessageRouter(roomManager, connectionRegistry, sendFrame);
+
+// Defining our looping engine variables
 const GET_INFO = 1;
 const GET_LENGTH = 2; 
 const GET_MASK_KEY = 3; 
@@ -10,23 +56,52 @@ const GET_PAYLOAD = 4;
 const SEND_ECHO = 5;  
 const GET_CLOSE_INFO = 6; 
 
-// server object creation
+// Server object creation
 const http_server = http.createServer((req, res) => {
     res.writeHead(200);
     res.end('Hello World!');
 });
 
-// starting server
+// Starting server
 http_server.listen(CONSTANTS.PORT, () => {
-    console.log("The http server is listening on port " + CONSTANTS.PORT);
+    Logger.info(`The http server is listening on port ${CONSTANTS.PORT}`);
 });
 
-// basically we are registering callback with every possible error we will be facing 
+// Register callbacks for error events
 CONSTANTS.CUSTOM_ERRORS.forEach(errorEvent => {
     process.on(errorEvent, (err) => {
-        console.log('the code caught an error event: ' + errorEvent);
-        console.log(err);
+        Logger.error(`The code caught an error event: ${errorEvent}`, { error: err.message || err });
         process.exit(1);
+    });
+});
+
+// Graceful shutdown on SIGTERM / SIGINT (Layer 1 Defense for Nodemon / Process restart)
+['SIGTERM', 'SIGINT'].forEach(signal => {
+    process.on(signal, () => {
+        Logger.info(`Received ${signal}. Gracefully shutting down...`);
+        const allIds = connectionRegistry.getAllIds();
+
+        for (const connectionId of allIds) {
+            const socket = connectionRegistry.getSocket(connectionId);
+            if (socket && !socket.destroyed) {
+                // Send RFC 6455 Close Frame with Code 1012 (Service Restart)
+                const closeFramePayload = Buffer.alloc(2);
+                closeFramePayload.writeInt16BE(1012, 0); // 1012 = Service Restart
+                const firstByte = 0b10000000 | 0b00001000; // FIN (1) + OPCODE (8)
+                const secondByte = closeFramePayload.length;
+                const header = Buffer.from([firstByte, secondByte]);
+                const closeFrame = Buffer.concat([header, closeFramePayload]);
+                socket.write(closeFrame);
+                socket.end();
+            }
+        }
+
+        setTimeout(() => {
+            http_server.close(() => {
+                Logger.info('Server closed cleanly.');
+                process.exit(0);
+            });
+        }, 500);
     });
 });
 
@@ -40,7 +115,7 @@ http_server.on('upgrade', (req, socket, head) => {
     
     if (UTILITIES.check(socket, upgradeHeaderCheck, connectionHeaderCheck, methodCheck, originCheck)) {
         upgradeConnection(req, socket, head);
-    };
+    }
 });
 
 function upgradeConnection(req, socket, head) {
@@ -50,34 +125,52 @@ function upgradeConnection(req, socket, head) {
     startWebSocketConnection(socket);
 }
 
-function startWebSocketConnection(socket){
-    console.log(`WS CONNECTION ESTABLISHED WITH CLIENT PORT: ${socket.remotePort}`);
-    const receiver = new WebSocketReceiver(socket);
+function startWebSocketConnection(socket) {
+    const connectionId = connectionRegistry.generateId();
+    connectionRegistry.register(connectionId, socket);
+
+    Logger.info(`WS CONNECTION ESTABLISHED`, { connectionId, port: socket.remotePort });
+
+    const receiver = new WebSocketReceiver(socket, connectionId);
 
     receiver.startHeartbeat();
 
     socket.on('data', (chunk) => {
         receiver.processBuffer(chunk);
-    })
+    });
 
     socket.on('end', () => {
-        console.log('Closing Connection...');
+        Logger.info('Closing Connection (socket end)...', { connectionId });
         receiver.stopHeartbeat();
     });
 
     socket.on('close', () => {
         receiver.stopHeartbeat();
+        const leftRooms = roomManager.leaveAll(connectionId);
+        connectionRegistry.unregister(connectionId);
+
+        // Notify members in each left room
+        for (const roomName of leftRooms) {
+            const memberCount = roomManager.getMemberCount(roomName);
+            roomManager.broadcast(roomName, JSON.stringify({
+                action: 'user_left',
+                room: roomName,
+                userId: connectionId,
+                members: memberCount
+            }), connectionId, sendFrame);
+        }
     });
 }
 
 
 class WebSocketReceiver {
 
-    constructor(socket){
+    constructor(socket, connectionId) {
         this._socket = socket;
+        this._connectionId = connectionId;
     }
 
-    // define properties 
+    // Define properties 
     _buffersArray = [];
     _bufferedBytesLength = 0;
     _taskLoop = false; 
@@ -100,7 +193,7 @@ class WebSocketReceiver {
         this._buffersArray.push(chunk);
         this._bufferedBytesLength += chunk.length;
 
-        console.log("Chunk received of size : " + chunk.length);
+        Logger.debug("Chunk received", { size: chunk.length });
         this._startTaskLoop();
     }
 
@@ -108,7 +201,7 @@ class WebSocketReceiver {
         this._taskLoop = true;
 
         do {
-            switch(this._task){
+            switch (this._task) {
                 case GET_INFO:
                     this._getInfo();
                     break;
@@ -128,134 +221,134 @@ class WebSocketReceiver {
                     this._getCloseInfo();
                     break;  
             }
-        }while(this._taskLoop); 
+        } while (this._taskLoop); 
     }   
     
-    _getInfo(){
-        if(this._bufferedBytesLength < CONSTANTS.MIN_FRAME_SIZE){
+    _getInfo() {
+        if (this._bufferedBytesLength < CONSTANTS.MIN_FRAME_SIZE) {
             this._taskLoop = false;
             return;
         }
 
         const infoBuffer = this._consumeHeaders(CONSTANTS.MIN_FRAME_SIZE);
-        const firstByte  = infoBuffer[0];
-        const secondByte = infoBuffer[1];
 
-        this._fin = (firstByte & 0b10000000) === 0b10000000;
-        this._opcode = (firstByte & 0b00001111);
+        this._fin = Boolean(infoBuffer[0] & 0x80);
+        this._opcode = infoBuffer[0] & 0x0f;
 
-        if (this._opcode !== 0x00 && this._messageOpcode === null) {
-            this._messageOpcode = this._opcode;
+        if (this._opcode === CONSTANTS.OPCODE_TEXT || this._opcode === CONSTANTS.OPCODE_BINARY) {
+            if (!this._messageOpcode) {
+                this._messageOpcode = this._opcode;
+            }
         }
-        this._masked = (secondByte & 0b10000000) === 0b10000000;
-        this._initialPayloadSizeIndicator = secondByte & 0b01111111;    
-        
-        if(!this._masked) {
-            // end the socket connection and send a close frame
-            this._sendClose(1002, "MASK must be set.");
-            return; // stop — _sendClose already reset state and closed socket
-        };
 
-        // **** PING AND PONG FRAMES
-        // if([CONSTANTS.OPCODE_PING, CONSTANTS.OPCODE_PONG].includes(this._opcode)) {
-        //     // send a close frame and close the underlying WS connection
-        //     this._sendClose(1003, "The server does not accept ping or pong frames.");
-        //     return; // stop — prevents falling through to this._task = GET_LENGTH
-        // };
+        this._masked = Boolean(infoBuffer[1] & 0x80);
 
-        // 
+        if (!this._masked) {
+            this._sendClose(1002, "All client frames must be masked.");
+            return;
+        }
+
+        this._initialPayloadSizeIndicator = infoBuffer[1] & 0x7F;
+
+        if (this._opcode === CONSTANTS.OPCODE_CLOSE) {
+            this._task = GET_CLOSE_INFO;
+            return;
+        }
+
         this._task = GET_LENGTH;
-    } // *end Get Info
+    }
 
-    _getLength(){
-        // extract the length of the WS frame payload (or fragment)
-        switch(this._initialPayloadSizeIndicator){
-            case CONSTANTS.MEDIUM_DATA_FLAG:
-                let mediumPayloadLengthBuffer = this._consumeHeaders(CONSTANTS.MEDIUM_SIZE_CONSUMPTION);
-                this._framePayloadLength = mediumPayloadLengthBuffer.readUInt16BE(),
-                this._processLength();
-                break;
-            case CONSTANTS.LARGE_DATA_FLAG:
-                let largePayloadLengthBuffer = this._consumeHeaders(CONSTANTS.LARGE_SIZE_CONSUMPTION);
-                let bufBigInt = largePayloadLengthBuffer.readBigUInt64BE(); // returns a Big Int number
-                this._framePayloadLength = Number(bufBigInt); // convert Big Int into a normal number
-                this._processLength();
-                break;
-            default:
-                this._framePayloadLength = this._initialPayloadSizeIndicator;
-                this._processLength();
-        };  
-    }; // *end getLength
-
-    _processLength(){
-        this._totalPayloadLength += this._framePayloadLength;
-        
-        if(this._totalPayloadLength > this._maxPayload){
-            this._sendClose(1009, "The WS server does not support such huge message lengths.");
+    _getLength() {
+        if (this._initialPayloadSizeIndicator <= CONSTANTS.SMALL_DATA_SIZE) {
+            this._framePayloadLength = this._initialPayloadSizeIndicator;
+            this._task = GET_MASK_KEY;
+            return;
         }
 
-        this._task = GET_MASK_KEY;
-    } // *end processLength
+        if (this._initialPayloadSizeIndicator === CONSTANTS.MEDIUM_DATA_FLAG) {
+            if (this._bufferedBytesLength < CONSTANTS.MEDIUM_SIZE_CONSUMPTION) {
+                this._taskLoop = false;
+                return;
+            }
+            const lengthBuffer = this._consumeHeaders(CONSTANTS.MEDIUM_SIZE_CONSUMPTION);
+            this._framePayloadLength = lengthBuffer.readUInt16BE(0);
+            this._task = GET_MASK_KEY;
+            return;
+        }
 
-    _getMaskKey(){
-        this._mask = this._consumeHeaders(CONSTANTS.MASK_LENGTH);
-        // to extract our payload data
-        this._task = GET_PAYLOAD;
-    } // *end getMaskKey
+        if (this._initialPayloadSizeIndicator === CONSTANTS.LARGE_DATA_FLAG) {
+            if (this._bufferedBytesLength < CONSTANTS.LARGE_SIZE_CONSUMPTION) {
+                this._taskLoop = false;
+                return;
+            }
+            const lengthBuffer = this._consumeHeaders(CONSTANTS.LARGE_SIZE_CONSUMPTION);
+            this._framePayloadLength = Number(lengthBuffer.readBigInt64BE(0));
+            this._task = GET_MASK_KEY;
+            return;
+        }
 
-    _getPayload(){
-        if(this._bufferedBytesLength < this._framePayloadLength){
+        this._sendClose(1008, "Invalid payload size indicator");
+    }
+
+    _getMaskKey() {
+        if (this._bufferedBytesLength < CONSTANTS.MASK_LENGTH) {
             this._taskLoop = false;
             return;
         }
 
-        this._framesReceived++;
+        this._mask = this._consumeHeaders(CONSTANTS.MASK_LENGTH);
+        this._task = GET_PAYLOAD;
+    }
 
-        let frame_masked_payload_buffer = this._consumePayload(this._framePayloadLength);
-        let frame_unmasked_payload_buffer = UTILITIES._unmaskPayload(frame_masked_payload_buffer, this._mask);
-        
-         // push decoded / unmasked data into our fragments array
-        if(frame_unmasked_payload_buffer.length) {
-            this._fragments.push(frame_unmasked_payload_buffer);
+    _getPayload() {
+        if (this._bufferedBytesLength < this._framePayloadLength) {
+            this._taskLoop = false;
+            return;
         }
 
-        // **** PING FRAME RECEIVED (e.g. from non-browser client)
+        const payloadBuffer = this._consumePayload(this._framePayloadLength);
+        const frame_unmasked_payload_buffer = UTILITIES._unmaskPayload(payloadBuffer, this._mask);
+
+        this._totalPayloadLength += this._framePayloadLength;
+
+        if (this._totalPayloadLength > this._maxPayload) {
+            this._sendClose(1009, "Payload exceeds 1MiB limits.");
+            return;
+        }
+
+        this._framesReceived++;
+        this._fragments.push(frame_unmasked_payload_buffer);
+
         if (this._opcode === CONSTANTS.OPCODE_PING) {
-            console.log("Received PING Frame! Replying with PONG...");
+            Logger.debug("Received PING Frame. Replying with PONG...");
             this._sendPong(frame_unmasked_payload_buffer);
             return;
         }
 
-        // **** PONG FRAME RECEIVED (Browser replied to our 30s Ping)
         if (this._opcode === CONSTANTS.OPCODE_PONG) {
-            console.log("Received PONG response Frame! Connection is Alive.");
+            Logger.debug("Received PONG response Frame. Connection is Alive.");
             this._isAlive = true;
             this._reset();
             return;
         }
 
-        // **** CLOSE FRAME WITH A PAYLOAD
-        if(this._opcode === CONSTANTS.OPCODE_CLOSE) {
+        if (this._opcode === CONSTANTS.OPCODE_CLOSE) {
             this._task = GET_CLOSE_INFO;
             return;
-        };
+        }
 
-        if(this._framePayloadLength <= 0) {
-            this._sendClose(1008, "The text area can't be empty.");
+        if (this._framePayloadLength <= 0) {
+            this._sendClose(1008, "The message payload cannot be empty.");
             return;
-        };
+        }
 
         if (!this._fin) {
-            // FIN:0, loop and wait to get aditional fragments
             this._task = GET_INFO;
         } else {
-            // FIN: 1 - SEND DATA BACK TO THE CLIENT
-            console.log("TOTAL FRAMES RECEIVED IN THIS WS MESSAGE: " + this._framesReceived);
-            console.log("TOTAL PAYLOAD SIZE OF THE WS MESSAGE IS: " + this._totalPayloadLength);
+            Logger.debug("Full message received", { frames: this._framesReceived, totalBytes: this._totalPayloadLength });
             this._task = SEND_ECHO;
-        };
-
-    } // *end getPayload
+        }
+    }
 
     _consumePayload(n) {
         this._bufferedBytesLength -= n;
@@ -263,204 +356,167 @@ class WebSocketReceiver {
         const payloadBuffer = Buffer.alloc(n);
         let totalBytesRead = 0;
 
-        while(totalBytesRead < n){
+        while (totalBytesRead < n) {
             const buf = this._buffersArray[0];
             const bytesToRead = Math.min(n - totalBytesRead, buf.length);
 
             buf.copy(payloadBuffer, totalBytesRead, 0, bytesToRead);
             totalBytesRead += bytesToRead;
 
-            if(bytesToRead < buf.length){
+            if (bytesToRead < buf.length) {
                 this._buffersArray[0] = buf.slice(bytesToRead);
-            }else{
+            } else {
                 this._buffersArray.shift();
             }
         }
 
         return payloadBuffer;
-    } // *end consumePayload
+    }
 
-    _consumeHeaders(size){
+    _consumeHeaders(size) {
         this._bufferedBytesLength -= size;
 
-        if(size === this._buffersArray[0].length){
+        if (size === this._buffersArray[0].length) {
             return this._buffersArray.shift();
-        };
+        }
 
-        if(size < this._buffersArray[0].length){
+        if (size < this._buffersArray[0].length) {
             const infoBuffer = this._buffersArray[0];
             this._buffersArray[0] = this._buffersArray[0].slice(size);
             return infoBuffer.slice(0, size);
-        }else {
-            // n is > buffersArray[0]
+        } else {
             throw Error('You cannot extract more data from a ws frame than the actual frame size.');
-        };
-    } // *end Consume Headers
+        }
+    }
 
     _reset() {
-        this._buffersArray = [];                // array containing the chunks of data received
-        this._bufferedBytesLength = 0;          // a number, keep track of the total bytes in our custom buffer after each chunck of data is recevied
+        this._buffersArray = [];
+        this._bufferedBytesLength = 0;
         this._taskLoop = false; 
         this._task = GET_INFO;
-        this._fin = false;                      // Indicates if the final fragment of a message has been received.
-        this._opcode = null;                    // Opcode representing the type of received data.
-        this._messageOpcode = null;             // Reset initial message opcode.
-        this._masked = false;                   // Indicates whether the received frame is masked.
-        this._initialPayloadSizeIndicator = 0;  // Size indicator for the payload being processed.
-        this._framePayloadLength = 0;           // length of one WebSocket frame received
+        this._fin = false;
+        this._opcode = null;
+        this._messageOpcode = null;
+        this._masked = false;
+        this._initialPayloadSizeIndicator = 0;
+        this._framePayloadLength = 0;
         this._totalPayloadLength = 0; 
-        this._mask = Buffer.alloc(CONSTANTS.MASK_LENGTH); // this will hold the masking key set and sent by the client
-        this._framesReceived = 0;               // tally of how many frames have been received related to our websocket message
-        this._fragments = [];                   // store fragments (frames) for reassembly 
-    }; // *end reset
-    
+        this._mask = Buffer.alloc(CONSTANTS.MASK_LENGTH);
+        this._framesReceived = 0;
+        this._fragments = [];
+    }
 
     _sendClose(closeCode, closeReason) {
-        // extract and/or construct the closure code & reason
-        let closureCode = (typeof closeCode !== 'undefined' && closeCode) ? closeCode : 1000; // insert more complicated logic in your application
-        let closureReason = (typeof closeReason !== 'undefined' && closeReason) ? closeReason : "";
+        let closureCode = (typeof closeCode !== 'undefined' && closeCode) ? closeCode : 1000;
+        let closureReasonBuffer = (typeof closeReason !== 'undefined' && closeReason) ? Buffer.from(closeReason) : Buffer.from("Closure by server.");
 
-        // get the length of the binary representation of our reason
-        const closureReasonBuffer = Buffer.from(closureReason, 'utf8');
-        const closureReasonLength = closureReasonBuffer.length; 
-
-        // construct the close frame payload (mandatory 2 byte closure code, + payload)
-        const closeFramePayload = Buffer.alloc(2 + closureReasonLength);
-        // write the close code into the payload
-        closeFramePayload.writeInt16BE(closureCode, 0); // closure status code, starting at the beginning of our payload buffer
+        let closeFramePayload = Buffer.alloc(2 + closureReasonBuffer.length);
+        closeFramePayload.writeInt16BE(closureCode, 0);
         closureReasonBuffer.copy(closeFramePayload, 2);
 
-        // final step: create the first byte and second byte, and then create the final frame to send back the client
-        const firstByte = 0b10000000 | 0b00000000 | 0b00001000; // FIN (1) + RSV (0) + OPCODE (8)
+        const firstByte = 0b10000000 | 0b00001000; // FIN (1) + OPCODE (8)
         const secondByte = closeFramePayload.length;
         const mandatoryCloseHeaders = Buffer.from([firstByte, secondByte]);
 
-        // now create the final close frame
         const closeFrame = Buffer.concat([mandatoryCloseHeaders, closeFramePayload]);
 
-        // send the close frame, and reset the receiver properties
         this._socket.write(closeFrame);
-        this._socket.end(); // ending the TCP websocket connection in compliance with the RFC
+        this._socket.end();
 
-        // stop heartbeat timer and reset
         this.stopHeartbeat();
         this._reset();
-
-    }; // *end sendClose
+    }
 
     _sendEcho() {
-        // **** TASK 1: CONSTRUCT AN EMPTY FRAME WITH CORRECT SIZE ****
-        // extract our entire message (could consist of numerous frames) from our persistent _fragments array, and create ONE buffer with the entire message
-        const fullMessage = Buffer.concat(this._fragments); // this is the actual 'payload' of our WS frame
+        const fullMessage = Buffer.concat(this._fragments);
+        const opcode = this._messageOpcode || CONSTANTS.OPCODE_TEXT;
 
-        // extract the payload length
-        let payloadLength = fullMessage.length; 
-        // initiate the additional payload size indicator variable (result will either be 0, 2, 8);
-        let additionalPayloadSizeIndicator = null; 
-
-        // determine the additional bytes required to represent the payload size
-        switch (true) {
-            case (payloadLength <= CONSTANTS.SMALL_DATA_SIZE):
-                additionalPayloadSizeIndicator = 0; // all payload size info is displayed in the initial 7 bits contained in the second byte
-                break;
-            case (payloadLength > CONSTANTS.SMALL_DATA_SIZE && payloadLength <= CONSTANTS.MEDIUM_DATA_SIZE): 
-                additionalPayloadSizeIndicator = CONSTANTS.MEDIUM_SIZE_CONSUMPTION;
-                break; 
-            default:
-                additionalPayloadSizeIndicator = CONSTANTS.LARGE_SIZE_CONSUMPTION; 
-        };
-
-        // mini-mission is complete: create an empty binary frame with the correct size
-        const frame = Buffer.alloc(CONSTANTS.MIN_FRAME_SIZE + additionalPayloadSizeIndicator + payloadLength);
-        
-        // *** task 2: populate the frame with all header info
-        // 1️ first byte
-        let fin = 0x01; // 0b00000001
-        let rsv1 = 0x00;
-        let rsv2 = 0x00;
-        let rsv3 = 0x00;
-        let opcode = this._messageOpcode || CONSTANTS.OPCODE_BINARY; 
-        // shift biwise operator - shift all bits to their correct positions
-        let firstByte = (fin << 7) | (rsv1 << 6) | (rsv2 << 5) | (rsv3 << 4) | opcode;
-        frame[0] = firstByte; // FIN, RSV, + OPCODE
-
-        // 2️ populate our frame with the payload length 
-        // set masking bit (0 for server to client)
-        let maskingBit = 0x00; // 0b00000000 or 0 in decimal
-
-        if(payloadLength <= CONSTANTS.SMALL_DATA_SIZE) {
-            // set the second byte to indicate the actual payload
-            frame[1] = (maskingBit | payloadLength);
-        } else if (payloadLength <= CONSTANTS.MEDIUM_DATA_SIZE) {
-            // task 1: populate the second byte in the frame header
-            frame[1] = (maskingBit | CONSTANTS.MEDIUM_DATA_FLAG); // 0b01111110;
-            // task 2: populate the remaining 2 bytes with the payload size
-            frame.writeUInt16BE(payloadLength, CONSTANTS.MIN_FRAME_SIZE); 
+        if (opcode === CONSTANTS.OPCODE_TEXT) {
+            const payloadString = fullMessage.toString('utf8');
+            messageRouter.handleMessage(this._connectionId, payloadString);
+            this._reset();
         } else {
-            // task 1: populate the second byte in the frame header
-            frame[1] = (maskingBit | CONSTANTS.LARGE_DATA_FLAG); // 0b01111111;
-            // task 2: populate the remaining 8 bytes with the payload size
-            frame.writeBigInt64BE(BigInt(payloadLength), CONSTANTS.MIN_FRAME_SIZE);
-        };
+            // Binary data framing & echo
+            let payloadLength = fullMessage.length; 
+            let additionalPayloadSizeIndicator = 0; 
 
-        // task 3: add payload to the frame
-        // copy our message into the frame buffer
-        const messageStartOffset = CONSTANTS.MIN_FRAME_SIZE + additionalPayloadSizeIndicator;
-        fullMessage.copy(frame, messageStartOffset);
+            if (payloadLength > CONSTANTS.SMALL_DATA_SIZE && payloadLength <= CONSTANTS.MEDIUM_DATA_SIZE) {
+                additionalPayloadSizeIndicator = CONSTANTS.MEDIUM_SIZE_CONSUMPTION;
+            } else if (payloadLength > CONSTANTS.MEDIUM_DATA_SIZE) {
+                additionalPayloadSizeIndicator = CONSTANTS.LARGE_SIZE_CONSUMPTION;
+            }
 
-        // send the frame to the client and reset all values
-        this._socket.write(frame);
-        this._reset();
-    }; // *end sendEcho
+            const frame = Buffer.alloc(CONSTANTS.MIN_FRAME_SIZE + additionalPayloadSizeIndicator + payloadLength);
+            
+            let fin = 0x01;
+            let firstByte = (fin << 7) | CONSTANTS.OPCODE_BINARY;
+            frame[0] = firstByte;
+
+            let maskingBit = 0x00;
+
+            if (payloadLength <= CONSTANTS.SMALL_DATA_SIZE) {
+                frame[1] = (maskingBit | payloadLength);
+            } else if (payloadLength <= CONSTANTS.MEDIUM_DATA_SIZE) {
+                frame[1] = (maskingBit | CONSTANTS.MEDIUM_DATA_FLAG);
+                frame.writeUInt16BE(payloadLength, CONSTANTS.MIN_FRAME_SIZE);
+            } else {
+                frame[1] = (maskingBit | CONSTANTS.LARGE_DATA_FLAG);
+                frame.writeBigInt64BE(BigInt(payloadLength), CONSTANTS.MIN_FRAME_SIZE);
+            }
+
+            const messageStartOffset = CONSTANTS.MIN_FRAME_SIZE + additionalPayloadSizeIndicator;
+            fullMessage.copy(frame, messageStartOffset);
+
+            this._socket.write(frame);
+            this._reset();
+        }
+    }
 
     _getCloseInfo() {
-        let closeFramePayload = this._fragments[0]; // control frames cannot be fragmented. So we know that only one fragment exists in our array that contains our entire closure body data
-        if(!closeFramePayload) {
+        let closeFramePayload = this._fragments[0];
+        if (!closeFramePayload) {
             this._sendClose(1008, "Next time, pls set the status code.");
             return;
-        };  
-        // extract the close code from the first 2 bytes of the payload
-        let closeCode = closeFramePayload.readUInt16BE(); // reads the first 2 bytes of our buffer
-        let closeReason = closeFramePayload.toString('utf8', 2); // reads the remaining bytes as a UTF-8 string, starting from index 2
-        if(closeCode === 1001) {
+        }
+        let closeCode = closeFramePayload.readUInt16BE();
+        let closeReason = closeFramePayload.toString('utf8', 2);
+        if (closeCode === 1001) {
             this._socket.end();
             this._reset();
             return;
-        };
-        console.log(`Received close frame with code: ${closeCode} and reason: ${closeReason}`);
-        // prepare a server response / comment to send back 
+        }
+        Logger.info("Received close frame", { code: closeCode, reason: closeReason });
         let serverResponse = "Sorry to see you go. Please open up a new connection.";
-        // send a closure frame with the close code and reason
         this._sendClose(closeCode, serverResponse);
-    }; //*end getCloseInfo
+    }
 
     startHeartbeat() {
         this._isAlive = true;
         this._heartbeatTimer = setInterval(() => {
-            if(this._isAlive === false){
-                console.log("Client missed HeartBeat response. Closing connection...");
+            if (this._isAlive === false) {
+                Logger.info("Client missed HeartBeat response. Closing connection...");
                 return this._socket.destroy();
-            };
+            }
 
             this._isAlive = false;
             this._sendPing();
         }, 30000);
-    } // end* setHeartbeat
+    }
 
     stopHeartbeat() {
-        if(this._heartbeatTimer){
+        if (this._heartbeatTimer) {
             clearInterval(this._heartbeatTimer);
             this._heartbeatTimer = null;
         }
-    } // end* stopHeartbeat
+    }
 
-    _sendPing(){
+    _sendPing() {
         const firstByte = 0x89;
         const secondByte = 0x00;
         this._socket.write(Buffer.from([firstByte, secondByte]));
     }
 
-    _sendPong(payloadBuffer){
+    _sendPong(payloadBuffer) {
         const len = payloadBuffer ? payloadBuffer.length : 0;
         const firstByte = 0x8A;
         const secondByte = len;
@@ -472,3 +528,5 @@ class WebSocketReceiver {
     }
 
 }
+
+module.exports = { http_server, WebSocketReceiver };

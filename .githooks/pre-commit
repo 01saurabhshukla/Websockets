@@ -1,0 +1,29 @@
+#!/bin/bash
+
+# ============================================================
+# PRE-COMMIT HOOK
+# Runs all tests before allowing a commit.
+# If tests fail, the commit is blocked.
+# ============================================================
+
+echo ""
+echo "🔍 Pre-commit hook: Running tests..."
+echo "============================================"
+
+# Run all tests
+npm test 2>&1
+TEST_EXIT_CODE=$?
+
+if [ $TEST_EXIT_CODE -ne 0 ]; then
+    echo ""
+    echo "❌ COMMIT BLOCKED: Tests failed!"
+    echo "   Fix the failing tests before committing."
+    echo "   To skip this check (NOT recommended): git commit --no-verify"
+    echo "============================================"
+    exit 1
+fi
+
+echo ""
+echo "✅ All tests passed. Proceeding with commit."
+echo "============================================"
+exit 0
