@@ -2,7 +2,7 @@ const http = require('http');
 const CONSTANTS = require('./config/constants');
 const UTILITIES = require('./utilities/utilities');
 const Logger = require('./logger/Logger');
-const connectionRegistry = require('./connections/ConnectionsRegistry');
+const connectionRegistry = require('./connections/ConnectionRegistry');
 const roomManager = require('./rooms/RoomManager');
 const MessageRouter = require('./handlers/MessageRouter');
 

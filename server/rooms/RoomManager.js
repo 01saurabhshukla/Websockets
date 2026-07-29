@@ -1,5 +1,5 @@
 const Logger = require('../logger/Logger');
-const connectionRegistry = require('../connections/ConnectionsRegistry');
+const connectionRegistry = require('../connections/ConnectionRegistry');
 
 class RoomManager {
 

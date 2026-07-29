@@ -238,6 +238,11 @@ The list below contains all planned changes. The **user dictates the order**. Do
 | K | **Bug fix**: Ping frames rejected — should respond with pong | `server/app.js` | ✅ Done |
 | L | **Bug fix**: Event listener leaks in client HTML | `template.html` | ✅ Done |
 | M | **Bug fix**: CSS typo `0,9em` → `0.9em` | `styles.css` | ✅ Done |
+| N | Create `ConnectionsRegistry.js` — tracks all active sockets by ID | `server/connections/ConnectionsRegistry.js` (new) | ✅ Done |
+| O | Create `RoomManager.js` — join, leave, leaveAll, broadcast | `server/rooms/RoomManager.js` (new), `server/tests/rooms.test.js` (new) | ✅ Done |
+| P | Create `MessageRouter.js` — JSON protocol handler for room actions | `server/handlers/MessageRouter.js` (new) | ✅ Done |
+| Q | Wire rooms into `app.js` — integrate registry, roomManager, messageRouter; add graceful shutdown | `server/app.js` (modify) | ✅ Done |
+| R | Update `template.html` with room UI (join/leave/send) | `template.html` | 🔲 Not started |
 
 > **Note to agent**: When the user picks an item, mark its Status as `🔄 In progress`, complete it, run tests, update CHANGELOG, then mark it `✅ Done`. Never pick the next item without being told to.
 

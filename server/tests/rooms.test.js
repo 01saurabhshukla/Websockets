@@ -3,7 +3,7 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
 
-const registry = require('../connections/ConnectionsRegistry');
+const registry = require('../connections/ConnectionRegistry');
 const roomManager = require('../rooms/RoomManager');
 const MessageRouter = require('../handlers/MessageRouter');
 
