@@ -98,4 +98,49 @@ describe('Room & Connection Management Unit Tests', () => {
         registry.unregister(id2);
     });
 
+    it('MessageRouter delivers direct messages and returns ack to sender', () => {
+        const sentFrames = [];
+        const sendFrameFn = (socket, msg) => {
+            sentFrames.push({ socket, msg: JSON.parse(msg) });
+        };
+
+        const mockSocket1 = { id: 'sock1', destroyed: false };
+        const mockSocket2 = { id: 'sock2', destroyed: false };
+        const id1 = 'dm_test_1';
+        const id2 = 'dm_test_2';
+
+        registry.register(id1, mockSocket1);
+        registry.register(id2, mockSocket2);
+
+        const router = new MessageRouter(roomManager, registry, sendFrameFn);
+
+        sentFrames.length = 0;
+        router.handleMessage(id1, JSON.stringify({ action: 'direct', to: id2, text: 'Hello!' }));
+        assert.strictEqual(sentFrames.length, 2);                          // delivery + ack
+        assert.strictEqual(sentFrames[0].socket, mockSocket2);             // sent to target
+        assert.strictEqual(sentFrames[0].msg.action, 'direct');
+        assert.strictEqual(sentFrames[0].msg.from, id1);
+        assert.strictEqual(sentFrames[0].msg.text, 'Hello!');
+        assert.strictEqual(sentFrames[1].socket, mockSocket1);             // ack to sender
+        assert.strictEqual(sentFrames[1].msg.action, 'direct_sent');
+        assert.strictEqual(sentFrames[1].msg.to, id2);
+
+        // Error: self-message
+        sentFrames.length = 0;
+        router.handleMessage(id1, JSON.stringify({ action: 'direct', to: id1, text: 'Hi me' }));
+        assert.strictEqual(sentFrames.length, 1);
+        assert.strictEqual(sentFrames[0].msg.action, 'error');
+
+        // Error: unknown target
+        sentFrames.length = 0;
+        router.handleMessage(id1, JSON.stringify({ action: 'direct', to: 'conn_ghost', text: 'Hello?' }));
+        assert.strictEqual(sentFrames.length, 1);
+        assert.strictEqual(sentFrames[0].msg.action, 'error');
+
+        // Cleanup
+        registry.unregister(id1);
+        registry.unregister(id2);
+    });
+
+
 });

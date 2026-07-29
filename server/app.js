@@ -63,7 +63,7 @@ const http_server = http.createServer((req, res) => {
 });
 
 // Starting server
-http_server.listen(CONSTANTS.PORT, () => {
+http_server.listen(CONSTANTS.PORT, '0.0.0.0' ,() => {
     Logger.info(`The http server is listening on port ${CONSTANTS.PORT}`);
 });
 
@@ -130,6 +130,11 @@ function startWebSocketConnection(socket) {
     connectionRegistry.register(connectionId, socket);
 
     Logger.info(`WS CONNECTION ESTABLISHED`, { connectionId, port: socket.remotePort });
+    
+    sendFrame(socket, JSON.stringify({
+        action: 'welcome',
+        connectionId: connectionId
+    }));
 
     const receiver = new WebSocketReceiver(socket, connectionId);
 

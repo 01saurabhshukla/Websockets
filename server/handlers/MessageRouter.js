@@ -26,8 +26,9 @@ class MessageRouter {
             case 'message':
                 return this._handleRoomMessage(connectionId, parsed.room, parsed.text);
             case 'list_rooms':
-            case 'list-rooms':
                 return this._handleListRooms(connectionId);
+            case 'direct': 
+                return this._handleDirect(connectionId, parsed.to, parsed.text);
             default:
                 return this._sendError(connectionId, `Unknown action: ${action}`);
         }
@@ -102,6 +103,31 @@ class MessageRouter {
         if (socket && !socket.destroyed) {
             this._sendFrame(socket, message);
         }
+    }
+
+    _handleDirect(from, to, text){
+
+        if(!to) return this._sendError(from, 'Target Connection ID is required');
+        if(!text) return this._sendError(from, 'Message text is required');
+
+        if(to === from) return this._sendError(from, 'direct message to themselv is prohibited');
+
+        const targetSocket = this._registry.getSocket(to);
+        if (!targetSocket || targetSocket.destroyed) {
+            return this._sendError(from, `Connection "${to}" not found or disconnected`);
+        }
+
+        this._sendFrame(targetSocket, JSON.stringify({
+            action: 'direct',
+            from: from,
+            text: text
+        }));
+
+        this._sendToSender(from, JSON.stringify({
+            action: 'direct_sent',
+            to:     to
+        }));
+        Logger.debug('Direct message delivered', { from, to });
     }
 }
 

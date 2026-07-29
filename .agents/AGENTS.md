@@ -242,7 +242,7 @@ The list below contains all planned changes. The **user dictates the order**. Do
 | O | Create `RoomManager.js` — join, leave, leaveAll, broadcast | `server/rooms/RoomManager.js` (new), `server/tests/rooms.test.js` (new) | ✅ Done |
 | P | Create `MessageRouter.js` — JSON protocol handler for room actions | `server/handlers/MessageRouter.js` (new) | ✅ Done |
 | Q | Wire rooms into `app.js` — integrate registry, roomManager, messageRouter; add graceful shutdown | `server/app.js` (modify) | ✅ Done |
-| R | Update `template.html` with room UI (join/leave/send) | `template.html` | 🔲 Not started |
+| R | Update `template.html` with room UI (join/leave/send) | `template.html` | ✅ Done |
 
 > **Note to agent**: When the user picks an item, mark its Status as `🔄 In progress`, complete it, run tests, update CHANGELOG, then mark it `✅ Done`. Never pick the next item without being told to.
 

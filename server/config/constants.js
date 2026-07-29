@@ -18,6 +18,7 @@ module.exports = {
         'http://127.0.0.1:5500',
         'http://127.0.0.1:8000',
         'http://localhost:8000',
+        'http://192.168.1.58:8000',  // LAN access from other devices on the same network
         'null'
     ],
     GUID: "258EAFA5-E914-47DA-95CA-C5AB0DC85B11",

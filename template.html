@@ -4,162 +4,251 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebSockets Echo Demo</title>
-    <link rel="stylesheet" href="styles.css">
+    <title>WebSocket Dev Client</title>
+    <meta name="description" content="Interactive WebSocket client for learning. Echo Mode shows raw protocol, Rooms Mode shows multi-client broadcasting.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="client.css">
 </head>
 
 <body>
-    <div id="wrapper">
-        <!-- headers -->
-        <h1>WebSockets Echo Demo</h1>
-        <button type="submit" id="open_ws">Open WS</button>
-        <div id="status">Status: Not connected</div>
-        <div id="server_response"></div>
-        <!-- message table -->
-        <ul id="table"></ul>
-        <!-- form -->
-        <form id="form">
-            <textarea id="message" placeholder="Write your message here..." required></textarea>
-            <button type="submit">Send Message</button>
-            <button type="button" id="close_ws">Close Connection</button>
-            <button type="button" id="populate">Populate</button>
-        </form>
-    </div>
+    <div id="app">
 
-    <script>
-        const config = {
-            URL: 'ws://127.0.0.1:4000'
-        };
+        <!-- ── HEADER ── -->
+        <header id="site-header">
+            <div class="logo">
+                <div class="logo-icon" aria-hidden="true">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M5 12.55a11 11 0 0 1 14.08 0"/>
+                        <path d="M1.42 9a16 16 0 0 1 21.16 0"/>
+                        <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+                        <circle cx="12" cy="20" r="1" fill="currentColor"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1>WebSocket Dev Client</h1>
+                    <span class="logo-sub">ws://127.0.0.1:4000 &nbsp;·&nbsp; RFC 6455</span>
+                </div>
+            </div>
 
-        let open_ws_btn = document.getElementById("open_ws");
-        let close_ws_btn = document.getElementById("close_ws");
-        let populate_btn = document.getElementById("populate");
-        let form = document.getElementById("form");
-        let server_response = document.getElementById("server_response");
-        let socketStatus = document.getElementById("status");
-        let table = document.getElementsByTagName("ul")[0];
-        let message = document.getElementById("message");
-        let text = "A".repeat(150000);
-        let socket = null;
+            <div id="mode-toggle" role="tablist" aria-label="Client mode">
+                <button class="mode-btn active" id="btn-echo-mode" role="tab" aria-selected="true" aria-controls="echo-ui">
+                    ⚡ Echo Mode
+                </button>
+                <button class="mode-btn" id="btn-rooms-mode" role="tab" aria-selected="false" aria-controls="rooms-ui">
+                    🏠 Rooms Mode
+                </button>
+            </div>
+        </header>
 
-        populate_btn.addEventListener('click', () => {
-            message.value = text;
-        });
+        <!-- ── MODE DESCRIPTION BANNER ── -->
+        <div id="mode-banner">
+            <div id="echo-banner" class="banner-text">
+                <strong>Echo Mode</strong> — bare WebSocket protocol. Connect, send any text, see it echoed back. No rooms, no JSON, no extras. Start here to learn the protocol.
+            </div>
+            <div id="rooms-banner" class="banner-text" style="display:none;">
+                <strong>Rooms Mode</strong> — multi-client broadcasting. Join named rooms, send messages to rooms, and see broadcasts from other users in real time.
+            </div>
+        </div>
 
-        form.addEventListener('submit', (e) => {
-            e.preventDefault();
+        <!-- ── CONNECTION BAR ── -->
+        <div id="connection-bar">
+            <div class="conn-status">
+                <span id="status-dot" class="status-dot" aria-hidden="true"></span>
+                <span id="status-text" class="status-text">Not connected</span>
+                <span id="conn-id-badge" class="conn-id-badge" aria-label="Connection ID"></span>
+            </div>
+            <div class="conn-actions">
+                <button class="btn btn-primary" id="open-btn">Connect</button>
+                <button class="btn btn-danger"  id="close-btn" disabled>Disconnect</button>
+            </div>
+        </div>
 
-            if (socket && socket.readyState === 1) {
-                let user_text = message.value;
-                socket.send(user_text);
-                table.innerHTML += '<li class="sent"><span>SENT:</span>' + user_text + '</li>';
-                message.value = "";
-            }
-        });
+        <!-- ══════════════════════════════════
+             ECHO MODE
+        ══════════════════════════════════ -->
+        <div id="echo-ui" role="tabpanel" aria-labelledby="btn-echo-mode">
 
-        close_ws_btn.addEventListener("click", () => {
-            if (socket) {
-                socketStatus.innerHTML = "closing ... please wait ...";
-                socketStatus.classList.add('closing');
-                socket.close(1000, "I don't like you");
-            }
-            message.removeAttribute("required");
-            form.classList.remove("show");
-        });
+            <!-- log -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">Frame Log</span>
+                    <div class="header-actions">
+                        <span id="echo-frame-count" class="counter-badge">0 frames</span>
+                        <button class="btn btn-sm btn-ghost" id="echo-clear-btn">Clear</button>
+                    </div>
+                </div>
+                <div id="echo-log" class="log-feed" role="log" aria-live="polite" aria-label="WebSocket frame log">
+                    <div class="log-empty">Connect to start logging frames…</div>
+                </div>
+                <div class="log-legend">
+                    <span class="legend-item sent">■ Sent</span>
+                    <span class="legend-item recv">■ Received</span>
+                    <span class="legend-item system">■ System</span>
+                    <span class="legend-item error">■ Error</span>
+                </div>
+            </div>
 
-        // --- WEBSOCKET OPEN BUTTON HANDLER ---
+            <!-- send form -->
+            <div class="card" id="echo-form-card">
+                <div class="card-header">
+                    <span class="card-title">Send Raw Message</span>
+                    <button class="btn btn-sm btn-ghost" id="populate-btn" title="Fill textarea with 150KB of data to test large frame handling">Fill 150 KB</button>
+                </div>
+                <div class="card-body">
+                    <textarea
+                        id="echo-message"
+                        placeholder="Type a message… the server will echo it back exactly as sent. Press Enter to send, Shift+Enter for a new line."
+                        disabled
+                        aria-label="Message to send"
+                        rows="4"
+                    ></textarea>
+                    <div class="btn-row">
+                        <button class="btn btn-primary" id="echo-send-btn" disabled>Send</button>
+                        <span class="hint-text">Enter to send &nbsp;·&nbsp; Shift+Enter for newline</span>
+                    </div>
+                </div>
+            </div>
 
-        open_ws_btn.addEventListener("click", () => {
-            open_ws_btn.disabled = true;
-            open_ws_btn.style.background = "gray";
-            open_ws_btn.style.pointerEvents = "none";
-            open_ws_btn.textContent = "Button Disabled";
-            socketStatus.innerHTML = "Connecting...";
+        </div>
 
-            socket = new WebSocket(config.URL);
+        <!-- ══════════════════════════════════
+             ROOMS MODE
+        ══════════════════════════════════ -->
+        <div id="rooms-ui" role="tabpanel" aria-labelledby="btn-rooms-mode" style="display:none;">
 
-            socket.onopen = (openEvent) => {
-                console.log("SOCKET CONNECTING STATUS IS: " + socket.readyState);
-                table.innerHTML = "";
-                server_response.innerHTML = "";
-                console.log("SOCKET CONNECTING STATUS IS: " + socket.readyState);
-                socketStatus.innerHTML = `Connected to: ${openEvent.currentTarget.url}`;
-                socketStatus.className = "open";
-                form.className = "show";
-            };
+            <!-- log -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">Room Activity Log</span>
+                    <div class="header-actions">
+                        <span id="rooms-event-count" class="counter-badge">0 events</span>
+                        <button class="btn btn-sm btn-ghost" id="rooms-clear-btn">Clear</button>
+                    </div>
+                </div>
+                <div id="rooms-log" class="log-feed" role="log" aria-live="polite" aria-label="Room activity log">
+                    <div class="log-empty">Connect and join a room to see activity…</div>
+                </div>
+                <div class="log-legend">
+                    <span class="legend-item join">■ Joined</span>
+                    <span class="legend-item leave">■ Left</span>
+                    <span class="legend-item recv">■ Message</span>
+                    <span class="legend-item sent">■ Sent</span>
+                    <span class="legend-item error">■ Error</span>
+                </div>
+            </div>
 
-            socket.onmessage = function(messageEvent) {
-                console.log(socket);
-                console.log(messageEvent);
+            <!-- ── DIRECT MESSAGE ── -->
+            <div class="card" id="dm-card">
+                <div class="card-header">
+                    <span class="card-title">💬 Direct Message</span>
+                    <span class="card-hint">Enter the exact connection ID of the recipient</span>
+                </div>
+                <div class="card-body">
+                    <div class="dm-row">
+                        <div class="field-group dm-target-group">
+                            <label class="field-label" for="dm-target">To (Connection ID)</label>
+                            <input
+                                type="text"
+                                id="dm-target"
+                                placeholder="conn_2"
+                                disabled
+                                autocomplete="off"
+                                aria-label="Target connection ID"
+                            />
+                        </div>
+                        <div class="field-group" style="flex: 1;">
+                            <label class="field-label" for="dm-message">Message</label>
+                            <input
+                                type="text"
+                                id="dm-message"
+                                placeholder="Private message…"
+                                disabled
+                                aria-label="Direct message content"
+                            />
+                        </div>
+                        <div class="dm-btn-wrap">
+                            <button class="btn btn-primary" id="dm-send-btn" disabled>Send DM</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-                if (typeof messageEvent.data === 'string') {
-                    const msg = messageEvent.data;
-                    table.innerHTML += '<li><span>Received:</span>' + msg + '</li>';
-                    message.placeholder = `(Previous message size: ${msg.length})`;
-                } else if (messageEvent.data instanceof Blob) {
-                    const reader = new FileReader();
-                    reader.readAsText(messageEvent.data);
-                    reader.onload = function(e) {
-                        const msg = e.target.result;
-                        table.innerHTML += '<li><span>Received:</span>' + msg + '</li>';
-                        message.placeholder = `(Previous message size: ${msg.length})`;
-                    };
-                } else {
-                    console.log("received unexpected data: ", messageEvent.data);
-                }
-            };
+            <!-- rooms grid: sidebar + send panel -->
+            <div id="rooms-grid">
 
-            socket.onclose = (closeEventObject) => {
-                console.log("CLOSE EVENT FIRED. CLOSE OBJECT", closeEventObject);
-                socketStatus.className = "closed";
-                table.innerHTML = "";
-                switch (closeEventObject.code) {
-                    case 1001:
-                        socketStatus.innerHTML = `Disconnected reason: ${closeEventObject.reason}`;
-                        table.innerHTML = "";
-                        break; 
-                    case 1002:
-                        socketStatus.innerHTML = `Disconnected reason: ${closeEventObject.reason}`;
-                        table.innerHTML = "";
-                        server_response.innerHTML = `The server responded: ${closeEventObject.reason}`;
-                        break; 
-                    case 1003: 
-                        socketStatus.innerHTML = `Unsupported data type.`;
-                        table.innerHTML = "";
-                        server_response.innerHTML = `The server responded: ${closeEventObject.reason}`;
-                        break; 
-                    case 1006:
-                        socketStatus.innerHTML = "Something is wrong with your WS network connection";
-                        break;
-                    case 1008:
-                        socketStatus.innerHTML = "You violated server policy.";
-                        server_response.innerHTML = `The server responded: ${closeEventObject.reason}`;
-                        break;
-                    case 1009: 
-                        socketStatus.innerHTML = `Data too long.`;
-                        table.innerHTML = "";
-                        server_response.innerHTML = `The server responded: ${closeEventObject.reason}`;
-                        break; 
-                    default:
-                        socketStatus.innerHTML = `You disconnected by clicking the Close button.`;
-                        server_response.innerHTML = `The server responded: ${closeEventObject.reason}`;
-                }
+                <!-- ── LEFT: JOIN + YOUR ROOMS ── -->
+                <div id="sidebar">
 
-                form.classList.remove("show");
-                message.setAttribute("required", "true");
-                open_ws_btn.disabled = false; 
-                open_ws_btn.style.background = '';
-                open_ws_btn.style.pointerEvents = '';
-                open_ws_btn.textContent = "Open WS";
-            };
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">Join a Room</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="input-row">
+                                <input
+                                    type="text"
+                                    id="join-room-input"
+                                    placeholder="room name"
+                                    disabled
+                                    aria-label="Room name to join"
+                                    autocomplete="off"
+                                />
+                                <button class="btn btn-success" id="join-btn" disabled>Join</button>
+                            </div>
+                        </div>
+                    </div>
 
-            socket.onerror = (error) => {
-                console.log("Error event was thrown. ERROR OBJECT: ", error);
-                socketStatus.innerHTML = "Error.";
-                socketStatus.className = "closed";
-            };
-        });
-    </script>
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">Your Rooms</span>
+                            <button class="btn btn-sm btn-ghost" id="list-rooms-btn" disabled title="Ask server for the list of rooms you are in">Refresh</button>
+                        </div>
+                        <div class="card-body" style="padding: 0.5rem 0.875rem 0.875rem;">
+                            <ul id="room-list" aria-label="Rooms you have joined" aria-live="polite">
+                                <li id="no-rooms-msg" class="no-rooms-msg">Not in any rooms yet</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- ── RIGHT: SEND TO ROOM ── -->
+                <div class="card" id="rooms-send-card">
+                    <div class="card-header">
+                        <span class="card-title">Send to Room</span>
+                    </div>
+                    <div class="card-body rooms-send-body">
+                        <div class="field-group">
+                            <label class="field-label" for="room-select-send">Target Room</label>
+                            <select id="room-select-send" disabled aria-label="Select room to send to">
+                                <option value="">— join a room first —</option>
+                            </select>
+                        </div>
+                        <div class="field-group" style="flex:1; display:flex; flex-direction:column;">
+                            <label class="field-label" for="rooms-message">Message</label>
+                            <textarea
+                                id="rooms-message"
+                                placeholder="Type a message to broadcast to all members of the selected room…"
+                                disabled
+                                aria-label="Message to broadcast"
+                                style="flex:1; min-height: 120px;"
+                            ></textarea>
+                        </div>
+                        <div class="btn-row">
+                            <button class="btn btn-primary" id="rooms-send-btn" disabled>Broadcast</button>
+                            <span class="hint-text">Enter to send &nbsp;·&nbsp; Shift+Enter for newline</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div><!-- /#rooms-grid -->
+
+        </div><!-- /#rooms-ui -->
+
+    </div><!-- /#app -->
+
+    <script src="client.js"></script>
 </body>
-
 </html>
