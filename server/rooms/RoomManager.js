@@ -64,6 +64,12 @@ class RoomManager {
         return result;
     }
 
+    getAllRooms() {
+        const rooms = Array.from(this._rooms.keys());
+        Logger.info('All rooms requested', { count: rooms.length, rooms });
+        return rooms;
+    }
+
     // Get all member IDs in a room
     getMembers(roomName) {
         const room = this._rooms.get(roomName);

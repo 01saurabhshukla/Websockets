@@ -1,6 +1,8 @@
 
 module.exports = {
     PORT: 4000,
+    LOG_LEVEL: 'INFO', // 'DEBUG' | 'INFO' | 'WARN' | 'ERROR'
+
     CUSTOM_ERRORS: [
         'uncaughtException',
         'unhandledRejection',

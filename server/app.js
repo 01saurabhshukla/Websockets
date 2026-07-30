@@ -63,7 +63,7 @@ const http_server = http.createServer((req, res) => {
 });
 
 // Starting server
-http_server.listen(CONSTANTS.PORT, '0.0.0.0' ,() => {
+http_server.listen(CONSTANTS.PORT, '0.0.0.0', () => {
     Logger.info(`The http server is listening on port ${CONSTANTS.PORT}`);
 });
 

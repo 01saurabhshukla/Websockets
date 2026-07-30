@@ -4,8 +4,8 @@ class MessageRouter {
 
     constructor(roomManager, connectionRegistry, sendFrameFn) {
         this._roomManager = roomManager;
-        this._registry    = connectionRegistry;
-        this._sendFrame   = sendFrameFn;
+        this._registry = connectionRegistry;
+        this._sendFrame = sendFrameFn;
     }
 
     handleMessage(connectionId, payloadString) {
@@ -15,7 +15,7 @@ class MessageRouter {
         } catch (error) {
             return this._sendToSender(connectionId, payloadString);
         }
-
+        // Logger.info("Input JSON: ", { parsed: parsed });
         const action = parsed.action;
 
         switch (action) {
@@ -27,7 +27,13 @@ class MessageRouter {
                 return this._handleRoomMessage(connectionId, parsed.room, parsed.text);
             case 'list_rooms':
                 return this._handleListRooms(connectionId);
-            case 'direct': 
+            case 'list_all_rooms':
+                return this._handleListAllRooms(connectionId);
+            case 'list_all_users':
+                return this._handleListAllUsers(connectionId);
+            case 'typing':
+                return this._handleTypingNotification(connectionId, parsed.to);
+            case 'direct':
                 return this._handleDirect(connectionId, parsed.to, parsed.text);
             default:
                 return this._sendError(connectionId, `Unknown action: ${action}`);
@@ -91,6 +97,34 @@ class MessageRouter {
         }));
     }
 
+    _handleListAllRooms(connectionId) {
+        const rooms = this._roomManager.getAllRooms();
+        this._sendToSender(connectionId, JSON.stringify({
+            action: 'all_rooms_list',
+            rooms: rooms
+        }));
+    }
+
+    _handleListAllUsers(connectionId) {
+        const users = this._registry.getAllIds();
+        Logger.debug('All Users: ', { users: users });
+        this._sendToSender(connectionId, JSON.stringify({
+            action: 'all_users',
+            users: users
+        }));
+    }
+
+    _handleTypingNotification(from, to) {
+        if (!to || to === from) return;
+        const targetSocket = this._registry.getSocket(to);
+        if (targetSocket && !targetSocket.destroyed) {
+            this._sendFrame(targetSocket, JSON.stringify({
+                action: 'typing',
+                from: from
+            }));
+        }
+    }
+
     _sendError(connectionId, message) {
         this._sendToSender(connectionId, JSON.stringify({
             action: 'error',
@@ -105,12 +139,12 @@ class MessageRouter {
         }
     }
 
-    _handleDirect(from, to, text){
+    _handleDirect(from, to, text) {
 
-        if(!to) return this._sendError(from, 'Target Connection ID is required');
-        if(!text) return this._sendError(from, 'Message text is required');
+        if (!to) return this._sendError(from, 'Target Connection ID is required');
+        if (!text) return this._sendError(from, 'Message text is required');
 
-        if(to === from) return this._sendError(from, 'direct message to themselv is prohibited');
+        if (to === from) return this._sendError(from, 'direct message to themselv is prohibited');
 
         const targetSocket = this._registry.getSocket(to);
         if (!targetSocket || targetSocket.destroyed) {
@@ -125,7 +159,7 @@ class MessageRouter {
 
         this._sendToSender(from, JSON.stringify({
             action: 'direct_sent',
-            to:     to
+            to: to
         }));
         Logger.debug('Direct message delivered', { from, to });
     }

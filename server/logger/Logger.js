@@ -7,6 +7,8 @@
  *   [LEVEL] [ISO_TIMESTAMP] message — {"key":"value"}
  */
 
+const CONSTANTS = require('../config/constants');
+
 const LEVELS = {
     DEBUG: 0,
     INFO:  1,
@@ -14,7 +16,7 @@ const LEVELS = {
     ERROR: 3,
 };
 
-const CONFIGURED_LEVEL = LEVELS[(process.env.LOG_LEVEL || 'INFO').toUpperCase()] ?? LEVELS.INFO;
+const CONFIGURED_LEVEL = LEVELS[CONSTANTS.LOG_LEVEL] ?? LEVELS.INFO;
 
 
 function _log(level, message, context) {

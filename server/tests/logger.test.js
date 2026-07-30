@@ -27,8 +27,7 @@ describe('Logger', () => {
         process.stdout.write = (str) => { stdoutOutput += str; return true; };
         process.stderr.write = (str) => { stderrOutput += str; return true; };
 
-        // Reset LOG_LEVEL to INFO for every test so we start from a clean state
-        process.env.LOG_LEVEL = 'DEBUG'; // set to DEBUG so all levels are visible in tests
+        // freshLogger(level) controls LOG_LEVEL per-test via constants mutation.
     });
 
     // After each test: restore real stdout/stderr
@@ -37,9 +36,12 @@ describe('Logger', () => {
         process.stderr.write = originalStderrWrite;
     });
 
-    // Helper: re-require Logger fresh so LOG_LEVEL changes take effect
-    function freshLogger() {
-        // Clear the module cache for Logger so it re-reads LOG_LEVEL
+    // Helper: re-require Logger fresh so LOG_LEVEL changes take effect.
+    // Logger reads LOG_LEVEL from constants.js, so we must clear both
+    // constants and Logger from the module cache before each re-require.
+    function freshLogger(level) {
+        const constants = require('../config/constants');
+        constants.LOG_LEVEL = level || 'DEBUG'; // mutate the live object
         delete require.cache[require.resolve('../logger/Logger')];
         return require('../logger/Logger');
     }
@@ -49,7 +51,7 @@ describe('Logger', () => {
     describe('Output format', () => {
 
         test('Logger.info writes [INFO ] tag, timestamp, and message to stdout', () => {
-            const Logger = freshLogger();
+            const Logger = freshLogger('DEBUG');
             Logger.info('hello world');
 
             assert.ok(stdoutOutput.includes('[INFO ]'), `Expected [INFO ] tag, got: ${stdoutOutput}`);
@@ -117,32 +119,28 @@ describe('Logger', () => {
     describe('LOG_LEVEL filtering', () => {
 
         test('does not emit DEBUG messages when LOG_LEVEL=INFO', () => {
-            process.env.LOG_LEVEL = 'INFO';
-            const Logger = freshLogger();
+            const Logger = freshLogger('INFO');
             Logger.debug('this should be silent');
 
             assert.strictEqual(stdoutOutput, '', 'DEBUG should be suppressed at INFO level');
         });
 
         test('does not emit INFO messages when LOG_LEVEL=WARN', () => {
-            process.env.LOG_LEVEL = 'WARN';
-            const Logger = freshLogger();
+            const Logger = freshLogger('WARN');
             Logger.info('this should be silent');
 
             assert.strictEqual(stdoutOutput, '', 'INFO should be suppressed at WARN level');
         });
 
         test('emits ERROR messages even at LOG_LEVEL=WARN', () => {
-            process.env.LOG_LEVEL = 'WARN';
-            const Logger = freshLogger();
+            const Logger = freshLogger('WARN');
             Logger.error('this should appear');
 
             assert.ok(stderrOutput.includes('[ERROR]'), 'ERROR should be emitted at WARN level');
         });
 
         test('emits all levels when LOG_LEVEL=DEBUG', () => {
-            process.env.LOG_LEVEL = 'DEBUG';
-            const Logger = freshLogger();
+            const Logger = freshLogger('DEBUG');
             Logger.debug('d');
             Logger.info('i');
 

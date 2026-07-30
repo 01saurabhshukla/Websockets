@@ -5,10 +5,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WebSocket Dev Client</title>
-    <meta name="description" content="Interactive WebSocket client for learning. Echo Mode shows raw protocol, Rooms Mode shows multi-client broadcasting.">
+    <meta name="description"
+        content="Interactive WebSocket client for learning. Echo Mode shows raw protocol, Rooms Mode shows multi-client broadcasting.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="client.css">
 </head>
 
@@ -19,11 +22,12 @@
         <header id="site-header">
             <div class="logo">
                 <div class="logo-icon" aria-hidden="true">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M5 12.55a11 11 0 0 1 14.08 0"/>
-                        <path d="M1.42 9a16 16 0 0 1 21.16 0"/>
-                        <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
-                        <circle cx="12" cy="20" r="1" fill="currentColor"/>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M5 12.55a11 11 0 0 1 14.08 0" />
+                        <path d="M1.42 9a16 16 0 0 1 21.16 0" />
+                        <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
+                        <circle cx="12" cy="20" r="1" fill="currentColor" />
                     </svg>
                 </div>
                 <div>
@@ -33,7 +37,8 @@
             </div>
 
             <div id="mode-toggle" role="tablist" aria-label="Client mode">
-                <button class="mode-btn active" id="btn-echo-mode" role="tab" aria-selected="true" aria-controls="echo-ui">
+                <button class="mode-btn active" id="btn-echo-mode" role="tab" aria-selected="true"
+                    aria-controls="echo-ui">
                     ⚡ Echo Mode
                 </button>
                 <button class="mode-btn" id="btn-rooms-mode" role="tab" aria-selected="false" aria-controls="rooms-ui">
@@ -45,10 +50,12 @@
         <!-- ── MODE DESCRIPTION BANNER ── -->
         <div id="mode-banner">
             <div id="echo-banner" class="banner-text">
-                <strong>Echo Mode</strong> — bare WebSocket protocol. Connect, send any text, see it echoed back. No rooms, no JSON, no extras. Start here to learn the protocol.
+                <strong>Echo Mode</strong> — bare WebSocket protocol. Connect, send any text, see it echoed back. No
+                rooms, no JSON, no extras. Start here to learn the protocol.
             </div>
             <div id="rooms-banner" class="banner-text" style="display:none;">
-                <strong>Rooms Mode</strong> — multi-client broadcasting. Join named rooms, send messages to rooms, and see broadcasts from other users in real time.
+                <strong>Rooms Mode</strong> — multi-client broadcasting. Join named rooms, send messages to rooms, and
+                see broadcasts from other users in real time.
             </div>
         </div>
 
@@ -61,7 +68,7 @@
             </div>
             <div class="conn-actions">
                 <button class="btn btn-primary" id="open-btn">Connect</button>
-                <button class="btn btn-danger"  id="close-btn" disabled>Disconnect</button>
+                <button class="btn btn-danger" id="close-btn" disabled>Disconnect</button>
             </div>
         </div>
 
@@ -94,16 +101,13 @@
             <div class="card" id="echo-form-card">
                 <div class="card-header">
                     <span class="card-title">Send Raw Message</span>
-                    <button class="btn btn-sm btn-ghost" id="populate-btn" title="Fill textarea with 150KB of data to test large frame handling">Fill 150 KB</button>
+                    <button class="btn btn-sm btn-ghost" id="populate-btn"
+                        title="Fill textarea with 150KB of data to test large frame handling">Fill 150 KB</button>
                 </div>
                 <div class="card-body">
-                    <textarea
-                        id="echo-message"
+                    <textarea id="echo-message"
                         placeholder="Type a message… the server will echo it back exactly as sent. Press Enter to send, Shift+Enter for a new line."
-                        disabled
-                        aria-label="Message to send"
-                        rows="4"
-                    ></textarea>
+                        disabled aria-label="Message to send" rows="4"></textarea>
                     <div class="btn-row">
                         <button class="btn btn-primary" id="echo-send-btn" disabled>Send</button>
                         <span class="hint-text">Enter to send &nbsp;·&nbsp; Shift+Enter for newline</span>
@@ -118,6 +122,38 @@
         ══════════════════════════════════ -->
         <div id="rooms-ui" role="tabpanel" aria-labelledby="btn-rooms-mode" style="display:none;">
 
+            <!-- ── SERVER OVERVIEW ── -->
+            <div id="server-overview">
+
+                <div class="card overview-card" id="users-panel">
+                    <div class="card-header">
+                        <span class="card-title">🟢 Online Users</span>
+                        <div class="header-actions">
+                            <span id="users-count" class="counter-badge">—</span>
+                            <button class="btn btn-sm btn-ghost" id="refresh-users-btn" disabled>Refresh</button>
+                        </div>
+                    </div>
+                    <ul id="users-list" class="overview-list" aria-label="Online users" aria-live="polite">
+                        <li class="overview-empty">Connect to load…</li>
+                    </ul>
+                </div>
+
+                <div class="card overview-card" id="all-rooms-panel">
+                    <div class="card-header">
+                        <span class="card-title">🏠 All Rooms</span>
+                        <div class="header-actions">
+                            <span id="all-rooms-count" class="counter-badge">—</span>
+                            <button class="btn btn-sm btn-ghost" id="refresh-all-rooms-btn" disabled>Refresh</button>
+                        </div>
+                    </div>
+                    <ul id="all-rooms-list" class="overview-list" aria-label="All server rooms" aria-live="polite">
+                        <li class="overview-empty">Connect to load…</li>
+                    </ul>
+                </div>
+
+            </div>
+
+
             <!-- log -->
             <div class="card">
                 <div class="card-header">
@@ -131,49 +167,47 @@
                     <div class="log-empty">Connect and join a room to see activity…</div>
                 </div>
                 <div class="log-legend">
-                    <span class="legend-item join">■ Joined</span>
-                    <span class="legend-item leave">■ Left</span>
-                    <span class="legend-item recv">■ Message</span>
-                    <span class="legend-item sent">■ Sent</span>
-                    <span class="legend-item error">■ Error</span>
+                    <span class="legend-item join"> Joined</span>
+                    <span class="legend-item leave"> Left</span>
+                    <span class="legend-item recv"> Message</span>
+                    <span class="legend-item sent"> Sent</span>
+                    <span class="legend-item error"> Error</span>
                 </div>
             </div>
 
             <!-- ── DIRECT MESSAGE ── -->
             <div class="card" id="dm-card">
                 <div class="card-header">
-                    <span class="card-title">💬 Direct Message</span>
-                    <span class="card-hint">Enter the exact connection ID of the recipient</span>
+                    <span class="card-title"> DM Inbox</span>
+                    <button class="btn btn-sm btn-ghost" id="dm-clear-btn">Clear</button>
                 </div>
-                <div class="card-body">
-                    <div class="dm-row">
-                        <div class="field-group dm-target-group">
-                            <label class="field-label" for="dm-target">To (Connection ID)</label>
-                            <input
-                                type="text"
-                                id="dm-target"
-                                placeholder="conn_2"
-                                disabled
-                                autocomplete="off"
-                                aria-label="Target connection ID"
-                            />
-                        </div>
-                        <div class="field-group" style="flex: 1;">
-                            <label class="field-label" for="dm-message">Message</label>
-                            <input
-                                type="text"
-                                id="dm-message"
-                                placeholder="Private message…"
-                                disabled
-                                aria-label="Direct message content"
-                            />
-                        </div>
-                        <div class="dm-btn-wrap">
-                            <button class="btn btn-primary" id="dm-send-btn" disabled>Send DM</button>
-                        </div>
-                    </div>
+
+                <!-- Recipient bar -->
+                <div id="dm-recipient-bar">
+                    <label class="field-label" for="dm-target">To</label>
+                    <input type="text" id="dm-target"
+                        placeholder="conn_2 — or click a user above"
+                        disabled autocomplete="off" aria-label="Target connection ID" />
+                </div>
+
+                <!-- Conversation log -->
+                <div id="dm-log" class="log-feed dm-log" role="log"
+                    aria-live="polite" aria-label="Direct message conversation">
+                    <div class="log-empty">No messages yet — select a user above or type a connection ID</div>
+                </div>
+
+                <!-- Typing indicator strip (hidden when empty) -->
+                <div id="dm-typing-strip" aria-live="polite" aria-label="Typing status"></div>
+
+                <!-- Send bar -->
+                <div id="dm-send-bar">
+                    <input type="text" id="dm-message"
+                        placeholder="Write a private message…"
+                        disabled aria-label="Direct message content" />
+                    <button class="btn btn-primary" id="dm-send-btn" disabled>Send DM</button>
                 </div>
             </div>
+
 
             <!-- rooms grid: sidebar + send panel -->
             <div id="rooms-grid">
@@ -187,14 +221,8 @@
                         </div>
                         <div class="card-body">
                             <div class="input-row">
-                                <input
-                                    type="text"
-                                    id="join-room-input"
-                                    placeholder="room name"
-                                    disabled
-                                    aria-label="Room name to join"
-                                    autocomplete="off"
-                                />
+                                <input type="text" id="join-room-input" placeholder="room name" disabled
+                                    aria-label="Room name to join" autocomplete="off" />
                                 <button class="btn btn-success" id="join-btn" disabled>Join</button>
                             </div>
                         </div>
@@ -203,7 +231,8 @@
                     <div class="card">
                         <div class="card-header">
                             <span class="card-title">Your Rooms</span>
-                            <button class="btn btn-sm btn-ghost" id="list-rooms-btn" disabled title="Ask server for the list of rooms you are in">Refresh</button>
+                            <button class="btn btn-sm btn-ghost" id="list-rooms-btn" disabled
+                                title="Ask server for the list of rooms you are in">Refresh</button>
                         </div>
                         <div class="card-body" style="padding: 0.5rem 0.875rem 0.875rem;">
                             <ul id="room-list" aria-label="Rooms you have joined" aria-live="polite">
@@ -228,13 +257,9 @@
                         </div>
                         <div class="field-group" style="flex:1; display:flex; flex-direction:column;">
                             <label class="field-label" for="rooms-message">Message</label>
-                            <textarea
-                                id="rooms-message"
-                                placeholder="Type a message to broadcast to all members of the selected room…"
-                                disabled
-                                aria-label="Message to broadcast"
-                                style="flex:1; min-height: 120px;"
-                            ></textarea>
+                            <textarea id="rooms-message"
+                                placeholder="Type a message to broadcast to all members of the selected room…" disabled
+                                aria-label="Message to broadcast" style="flex:1; min-height: 120px;"></textarea>
                         </div>
                         <div class="btn-row">
                             <button class="btn btn-primary" id="rooms-send-btn" disabled>Broadcast</button>
@@ -247,8 +272,11 @@
 
         </div><!-- /#rooms-ui -->
 
+        <button type="button" id="test-button">Hello</button>
+
     </div><!-- /#app -->
 
     <script src="client.js"></script>
 </body>
+
 </html>
