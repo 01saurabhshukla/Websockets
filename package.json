@@ -22,7 +22,5 @@
     "url": "https://github.com/01saurabhshukla/Websockets/issues"
   },
   "homepage": "https://github.com/01saurabhshukla/Websockets#readme",
-  "dependencies": {
-    "dotenv": "^17.4.2"
-  }
+  "dependencies": {}
 }
