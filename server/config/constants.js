@@ -3,9 +3,11 @@ module.exports = {
     PORT: 4000,
     LOG_LEVEL: 'INFO', // 'DEBUG' | 'INFO' | 'WARN' | 'ERROR'
 
-    CUSTOM_ERRORS: [
+    FATAL_ERRORS: [
         'uncaughtException',
-        'unhandledRejection',
+        'unhandledRejection'
+    ],
+    SHUTDOWN_SIGNALS: [
         'SIGINT',
         'SIGTERM'
     ],

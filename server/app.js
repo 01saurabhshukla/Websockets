@@ -67,41 +67,46 @@ http_server.listen(CONSTANTS.PORT, '0.0.0.0', () => {
     Logger.info(`The http server is listening on port ${CONSTANTS.PORT}`);
 });
 
-// Register callbacks for error events
-CONSTANTS.CUSTOM_ERRORS.forEach(errorEvent => {
-    process.on(errorEvent, (err) => {
-        Logger.error(`The code caught an error event: ${errorEvent}`, { error: err.message || err });
-        process.exit(1);
+// Helper function for clean process shutdown
+function gracefulShutdown(reason, exitCode = 0, closeCode = 1001) {
+    Logger.info(`Initiating graceful shutdown (${reason})...`);
+    const allIds = connectionRegistry.getAllIds();
+
+    for (const connectionId of allIds) {
+        const socket = connectionRegistry.getSocket(connectionId);
+        if (socket && !socket.destroyed) {
+            // Send RFC 6455 Close Frame with Code 1001 (Going Away) or 1011 (Internal Error)
+            const closeFramePayload = Buffer.alloc(2);
+            closeFramePayload.writeInt16BE(closeCode, 0);
+            const firstByte = 0b10000000 | 0b00001000; // FIN (1) + OPCODE (8)
+            const secondByte = closeFramePayload.length;
+            const header = Buffer.from([firstByte, secondByte]);
+            const closeFrame = Buffer.concat([header, closeFramePayload]);
+            socket.write(closeFrame);
+            socket.end();
+        }
+    }
+
+    setTimeout(() => {
+        http_server.close(() => {
+            Logger.info('Server closed cleanly.');
+            process.exit(exitCode);
+        });
+    }, 500);
+}
+
+// Graceful shutdown on OS Process Signals (SIGINT / SIGTERM)
+CONSTANTS.SHUTDOWN_SIGNALS.forEach(signal => {
+    process.on(signal, () => {
+        gracefulShutdown(signal, 0, 1001);
     });
 });
 
-// Graceful shutdown on SIGTERM / SIGINT (Layer 1 Defense for Nodemon / Process restart)
-['SIGTERM', 'SIGINT'].forEach(signal => {
-    process.on(signal, () => {
-        Logger.info(`Received ${signal}. Gracefully shutting down...`);
-        const allIds = connectionRegistry.getAllIds();
-
-        for (const connectionId of allIds) {
-            const socket = connectionRegistry.getSocket(connectionId);
-            if (socket && !socket.destroyed) {
-                // Send RFC 6455 Close Frame with Code 1012 (Service Restart)
-                const closeFramePayload = Buffer.alloc(2);
-                closeFramePayload.writeInt16BE(1012, 0); // 1012 = Service Restart
-                const firstByte = 0b10000000 | 0b00001000; // FIN (1) + OPCODE (8)
-                const secondByte = closeFramePayload.length;
-                const header = Buffer.from([firstByte, secondByte]);
-                const closeFrame = Buffer.concat([header, closeFramePayload]);
-                socket.write(closeFrame);
-                socket.end();
-            }
-        }
-
-        setTimeout(() => {
-            http_server.close(() => {
-                Logger.info('Server closed cleanly.');
-                process.exit(0);
-            });
-        }, 500);
+// Graceful shutdown on Fatal Runtime Errors (uncaughtException / unhandledRejection)
+CONSTANTS.FATAL_ERRORS.forEach(errorEvent => {
+    process.on(errorEvent, (err) => {
+        Logger.error(`Caught fatal runtime error: ${errorEvent}`, { error: err.stack || err.message || err });
+        gracefulShutdown(errorEvent, 1, 1011);
     });
 });
 
