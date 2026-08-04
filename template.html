@@ -17,8 +17,6 @@
 
 <body>
     <div id="app">
-
-        <!-- ── HEADER ── -->
         <header id="site-header">
             <div class="logo">
                 <div class="logo-icon" aria-hidden="true">
@@ -42,7 +40,10 @@
                     ⚡ Echo Mode
                 </button>
                 <button class="mode-btn" id="btn-rooms-mode" role="tab" aria-selected="false" aria-controls="rooms-ui">
-                    🏠 Rooms Mode
+                    Rooms Mode
+                </button>
+                <button class="mode-btn" id="btn-ttt-mode" role="tab" aria-selected="false" aria-controls="ttt-ui">
+                    🎮 Tic-Tac-Toe
                 </button>
             </div>
         </header>
@@ -56,6 +57,9 @@
             <div id="rooms-banner" class="banner-text" style="display:none;">
                 <strong>Rooms Mode</strong> — multi-client broadcasting. Join named rooms, send messages to rooms, and
                 see broadcasts from other users in real time.
+            </div>
+            <div id="ttt-banner" class="banner-text" style="display:none;">
+                <strong>Tic-Tac-Toe Mode</strong> — multiplayer match & live spectator system. Create or join matches as Player X/O or Spectator. Server validates every move in real time.
             </div>
         </div>
 
@@ -272,7 +276,48 @@
 
         </div><!-- /#rooms-ui -->
 
-        <button type="button" id="test-button">Hello</button>
+        <!-- ══════════════════════════════════
+             TIC-TAC-TOE MODE
+        ══════════════════════════════════ -->
+        <div id="ttt-ui" role="tabpanel" aria-labelledby="btn-ttt-mode" style="display:none;">
+            <div class="rooms-layout">
+                <!-- Left Sidebar: Matches list & create -->
+                <div class="rooms-sidebar">
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">Active Matches</span>
+                            <button class="btn btn-sm btn-ghost" id="ttt-refresh-btn" disabled>Refresh</button>
+                        </div>
+                        <div class="card-body">
+                            <button class="btn btn-primary" id="ttt-create-btn" disabled style="width:100%; margin-bottom:12px;">+ Create Match</button>
+                            <div id="ttt-match-list" class="room-list">
+                                <div class="log-empty">Connect and click refresh to load matches…</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Main: Game board & match status -->
+                <div class="rooms-main">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="room-header-info">
+                                <span class="card-title" id="ttt-match-title">No Match Selected</span>
+                                <span id="ttt-role-badge" class="counter-badge" style="display:none;">-</span>
+                            </div>
+                            <button class="btn btn-sm btn-danger" id="ttt-leave-btn" style="display:none;">Leave Match</button>
+                        </div>
+                        <div class="card-body" id="ttt-game-body" style="display:none;">
+                            <div id="ttt-status-banner" class="ttt-status-banner">Waiting for players…</div>
+                            <div id="ttt-board" class="ttt-board"></div>
+                        </div>
+                        <div id="ttt-empty-state" class="card-body" style="text-align:center; padding: 40px 20px; color: var(--text-muted);">
+                            Create a new match or join an active match from the sidebar.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
     </div><!-- /#app -->
 

@@ -4,6 +4,7 @@ const UTILITIES = require('./utilities/utilities');
 const Logger = require('./logger/Logger');
 const connectionRegistry = require('./connections/ConnectionRegistry');
 const roomManager = require('./rooms/RoomManager');
+const gameManager = require('./games/GameManager');
 const MessageRouter = require('./handlers/MessageRouter');
 
 // Standalone function to construct and send RFC 6455 WebSocket frames to any socket
@@ -156,6 +157,7 @@ function startWebSocketConnection(socket) {
 
     socket.on('close', () => {
         receiver.stopHeartbeat();
+        gameManager.leaveAllMatches(connectionId);
         const leftRooms = roomManager.leaveAll(connectionId);
         connectionRegistry.unregister(connectionId);
 

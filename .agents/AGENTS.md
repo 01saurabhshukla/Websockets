@@ -348,3 +348,20 @@ git config core.hooksPath .githooks
 ```
 
 **NEVER bypass hooks with `--no-verify`** unless explicitly approved by the user.
+
+---
+
+## 11. Custom Workspace Guidelines
+
+### Documentation & Approval First
+- Always document proposed changes and present technical plans/rationale to the user before taking action or modifying code/git history.
+
+### Git Push Restrictions
+- **STRICT RULE**: The agent is NOT allowed to execute `git push` or push changes/branches to any remote repository under any circumstances.
+- All remote git push actions must be performed manually by the user.
+
+### Core Engine in `app.js`
+- Keep the core WebSocket receiver engine in `app.js` unless explicitly instructed otherwise.
+
+### No `dotenv` Dependency
+- Do not use `dotenv` or `.env` files. Runtime configuration is managed in `server/config/constants.js`.

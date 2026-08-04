@@ -35,17 +35,21 @@ The accompanying client is a plain HTML/CSS/JS interface that uses the browser's
 | Structured logger | `server/logger/Logger.js` | 4-level API: `debug`, `info`, `warn`, `error` |
 | Connection registry (singleton) | `server/connections/ConnectionsRegistry.js` | Tracks all active sockets by ID (`conn_N`) |
 | Room management | `server/rooms/RoomManager.js` | join, leave, leaveAll, broadcast — exported as singleton |
-| JSON message routing | `server/handlers/MessageRouter.js` | Routes `join`, `leave`, `message`, `direct_message`, `list_rooms` actions |
+| JSON message routing | `server/handlers/MessageRouter.js` | Routes `join`, `leave`, `message`, `direct`, `typing`, `ttt_create`, `ttt_join`, `ttt_move`, `ttt_list`, `ttt_leave` actions |
 | `sendFrame()` helper function | `server/app.js` | Builds RFC 6455 frames, shared across RoomManager broadcasts |
 | Rooms wired into connection lifecycle | `server/app.js` | `leaveAll()` on socket `close`, `user_left` broadcast to remaining members |
 | Unit tests (utilities) | `server/tests/unit.test.js` | Utility tests passing |
 | Integration tests (handshake) | `server/tests/integration.test.js` | Handshake integration tests passing |
 | Logger tests | `server/tests/logger.test.js` | Logger tests passing |
 | Room & connection tests | `server/tests/rooms.test.js` | Room manager and connection registry tests passing |
+| Tic-Tac-Toe Game Engine | `server/games/TicTacToeGame.js` | Pure rules state machine for Tic-Tac-Toe |
+| Tic-Tac-Toe Match Manager | `server/games/GameManager.js` | Match roster orchestration, X/O slots, spectators, room binding |
+| Tic-Tac-Toe unit tests | `server/tests/tictactoe-game.test.js` | Unit tests for game rules and win detection passing |
+| GameManager unit tests | `server/tests/game-manager.test.js` | Unit tests for match creation, slots, move permissions passing |
 | Git hooks tests | `server/tests/githooks.test.js` | Git hooks tests passing |
 | Git hooks (pre-commit, commit-msg, pre-push) | `.githooks/` | Enforced via `git config core.hooksPath .githooks` |
 | Auto-activate hooks on `npm install` | `package.json` | `"prepare": "git config core.hooksPath .githooks"` |
-| Client HTML UI | `template.html`, `client.js`, `client.css` | Interactive client with room chat, direct messaging, user list, and logging |
+| Client HTML UI | `template.html`, `client.js`, `client.css` | Interactive client with Echo Mode, Rooms Mode, Direct Messaging, and Multiplayer Tic-Tac-Toe |
 
 ---
 

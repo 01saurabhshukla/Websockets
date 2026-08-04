@@ -19,14 +19,31 @@ const connIdBadge = document.getElementById('conn-id-badge');
 
 const btnEchoMode = document.getElementById('btn-echo-mode');
 const btnRoomsMode = document.getElementById('btn-rooms-mode');
+const btnTttMode = document.getElementById('btn-ttt-mode');
 const echoUi = document.getElementById('echo-ui');
 const roomsUi = document.getElementById('rooms-ui');
+const tttUi = document.getElementById('ttt-ui');
 const echoBanner = document.getElementById('echo-banner');
 const roomsBanner = document.getElementById('rooms-banner');
+const tttBanner = document.getElementById('ttt-banner');
 
 const directTargetInput = document.getElementById('dm-target');
 const directMessageInput = document.getElementById('dm-message');
 const dmSendBtn = document.getElementById('dm-send-btn');
+
+/* ──────────────────────────────────────────────
+   ELEMENT REFS — tic tac toe mode
+────────────────────────────────────────────── */
+const tttCreateBtn = document.getElementById('ttt-create-btn');
+const tttRefreshBtn = document.getElementById('ttt-refresh-btn');
+const tttMatchList = document.getElementById('ttt-match-list');
+const tttMatchTitle = document.getElementById('ttt-match-title');
+const tttRoleBadge = document.getElementById('ttt-role-badge');
+const tttLeaveBtn = document.getElementById('ttt-leave-btn');
+const tttGameBody = document.getElementById('ttt-game-body');
+const tttStatusBanner = document.getElementById('ttt-status-banner');
+const tttBoard = document.getElementById('ttt-board');
+const tttEmptyState = document.getElementById('ttt-empty-state');
 
 
 const testBtn = document.getElementById('test-button');
@@ -59,22 +76,22 @@ const roomsEventCount = document.getElementById('rooms-event-count');
 
 
 
-const usersList          = document.getElementById('users-list');
-const usersCount         = document.getElementById('users-count');
-const refreshUsersBtn    = document.getElementById('refresh-users-btn');
-const allRoomsList       = document.getElementById('all-rooms-list');
-const allRoomsCount      = document.getElementById('all-rooms-count');
+const usersList = document.getElementById('users-list');
+const usersCount = document.getElementById('users-count');
+const refreshUsersBtn = document.getElementById('refresh-users-btn');
+const allRoomsList = document.getElementById('all-rooms-list');
+const allRoomsCount = document.getElementById('all-rooms-count');
 const refreshAllRoomsBtn = document.getElementById('refresh-all-rooms-btn');
 
 let myConnectionId = null;   // set on 'welcome'
 
-const dmLog      = document.getElementById('dm-log');
+const dmLog = document.getElementById('dm-log');
 const dmClearBtn = document.getElementById('dm-clear-btn');
 
 const dmTypingStrip = document.getElementById('dm-typing-strip');
 
 const typingTimers = {};       // { connId: clearTimeoutId }
-let   typingSendTimer = null;  // throttle: one send per 1.5 s max
+let typingSendTimer = null;  // throttle: one send per 1.5 s max
 
 
 directMessageInput.addEventListener('input', () => {
@@ -106,10 +123,10 @@ function renderTypingStrip() {
     }
     // "conn_1", "conn_1 and conn_2", "conn_1, conn_2 and conn_3"
     let nameStr;
-    if (typers.length === 1)      nameStr = typers[0];
+    if (typers.length === 1) nameStr = typers[0];
     else if (typers.length === 2) nameStr = `${typers[0]} and ${typers[1]}`;
     else nameStr = typers.slice(0, -1).map(escapeHtml).join(', ') +
-                   ' and ' + escapeHtml(typers[typers.length - 1]);
+        ' and ' + escapeHtml(typers[typers.length - 1]);
     dmTypingStrip.innerHTML =
         `${escapeHtml(nameStr)} ${typers.length === 1 ? 'is' : 'are'} typing
          <span class="typing-dots"><span></span><span></span><span></span></span>`;
@@ -122,21 +139,34 @@ function renderTypingStrip() {
 ────────────────────────────────────────────── */
 btnEchoMode.addEventListener('click', () => switchMode('echo'));
 btnRoomsMode.addEventListener('click', () => switchMode('rooms'));
+btnTttMode.addEventListener('click', () => switchMode('ttt'));
 
 function switchMode(mode) {
     currentMode = mode;
 
     const isEcho = mode === 'echo';
+    const isRooms = mode === 'rooms';
+    const isTtt = mode === 'ttt';
 
     btnEchoMode.classList.toggle('active', isEcho);
-    btnRoomsMode.classList.toggle('active', !isEcho);
+    btnRoomsMode.classList.toggle('active', isRooms);
+    btnTttMode.classList.toggle('active', isTtt);
+
     btnEchoMode.setAttribute('aria-selected', isEcho);
-    btnRoomsMode.setAttribute('aria-selected', !isEcho);
+    btnRoomsMode.setAttribute('aria-selected', isRooms);
+    btnTttMode.setAttribute('aria-selected', isTtt);
 
     echoUi.style.display = isEcho ? 'flex' : 'none';
-    roomsUi.style.display = isEcho ? 'none' : 'flex';
+    roomsUi.style.display = isRooms ? 'flex' : 'none';
+    tttUi.style.display = isTtt ? 'flex' : 'none';
+
     echoBanner.style.display = isEcho ? 'block' : 'none';
-    roomsBanner.style.display = isEcho ? 'none' : 'block';
+    roomsBanner.style.display = isRooms ? 'block' : 'none';
+    tttBanner.style.display = isTtt ? 'block' : 'none';
+
+    if (isTtt && isConnected()) {
+        sendJSON({ action: 'ttt_list' });
+    }
 }
 
 /* ──────────────────────────────────────────────
@@ -163,15 +193,22 @@ function setConnected(url) {
     roomsMessage.disabled = false;
     roomsSendBtn.disabled = false;
     listRoomsBtn.disabled = false;
-    roomSelectSend.disabled = false;
+    roomSelectSend.disabled = false
 
     // DM
     directTargetInput.disabled = false;
     directMessageInput.disabled = false;
     dmSendBtn.disabled = false;
 
-    refreshUsersBtn.disabled = false; 
+    refreshUsersBtn.disabled = false;
     refreshAllRoomsBtn.disabled = false;
+
+    // Tic-Tac-Toe
+    tttCreateBtn.disabled = false;
+    tttRefreshBtn.disabled = false;
+    if (currentMode === 'ttt') {
+        sendJSON({ action: 'ttt_list' });
+    }
 }
 
 function setDisconnected(msg) {
@@ -197,8 +234,13 @@ function setDisconnected(msg) {
     directMessageInput.disabled = true;
     dmSendBtn.disabled = true;
 
-    refreshUsersBtn.disabled = true;  
+    refreshUsersBtn.disabled = true;
     refreshAllRoomsBtn.disabled = true;
+
+    // Tic-Tac-Toe
+    tttCreateBtn.disabled = true;
+    tttRefreshBtn.disabled = true;
+    resetTttState();
 
     // clear room UI state
     myRooms = [];
@@ -384,8 +426,11 @@ openBtn.addEventListener('click', () => {
         try { parsed = JSON.parse(raw); } catch (_) { }
         console.log("parsed", parsed);
         if (parsed && parsed.action) {
-            // Route to rooms log
-            handleRoomsMessage(parsed);
+            if (parsed.action.startsWith('ttt_')) {
+                handleTttMessage(parsed);
+            } else {
+                handleRoomsMessage(parsed);
+            }
             // Also show raw in echo log (so echo mode users can observe the protocol)
             appendToEcho('recv', 'RECV', raw.length > 200 ? raw.substring(0, 200) + '…' : raw);
         } else {
@@ -512,19 +557,17 @@ function sendRoomMessage() {
     sendJSON({ action: 'message', room, text });
     appendToRooms('sent', 'ME', `[#${room}] ${text}`);
     roomsMessage.value = '';
-}
+};
 
-testBtn.addEventListener('click', () => {
+!testBtn ?? testBtn.addEventListener('click', () => {
     sendJSON({ action: 'list_all_rooms' });
 });
 
-// ── List rooms ──
 listRoomsBtn.addEventListener('click', () => {
     sendJSON({ action: 'list_rooms' });
     appendToRooms('system', 'SEND', '→ list_rooms');
 });
 
-// ── Clear log ──
 roomsClearBtn.addEventListener('click', () => {
     roomsLog.innerHTML = '<div class="log-empty">Log cleared</div>';
     roomsCount = 0;
@@ -606,7 +649,7 @@ function handleRoomsMessage(msg) {
             break;
 
         case 'all_rooms_list':
-            
+
             break;
 
         case 'direct':
@@ -630,6 +673,202 @@ function handleRoomsMessage(msg) {
         default:
             appendToRooms('system', 'RECV', JSON.stringify(msg));
     }
+}
+
+/* ──────────────────────────────────────────────
+   TIC-TAC-TOE CLIENT LOGIC
+────────────────────────────────────────────── */
+const Ttt = {
+    matchId: null,
+    role: null,
+    mark: null,
+    state: null
+};
+
+function resetTttState() {
+    Ttt.matchId = null;
+    Ttt.role = null;
+    Ttt.mark = null;
+    Ttt.state = null;
+
+    tttMatchTitle.textContent = 'No Match Selected';
+    tttRoleBadge.style.display = 'none';
+    tttLeaveBtn.style.display = 'none';
+    tttGameBody.style.display = 'none';
+    tttEmptyState.style.display = 'block';
+    tttMatchList.innerHTML = '<div class="log-empty">Connect and click refresh to load matches…</div>';
+}
+
+tttCreateBtn.addEventListener('click', () => {
+    if (!isConnected()) return;
+    console.log("Button Clicked");
+    sendJSON({ action: 'ttt_create' });
+});
+
+tttRefreshBtn.addEventListener('click', () => {
+    if (!isConnected()) return;
+    sendJSON({ action: 'ttt_list' });
+});
+
+tttLeaveBtn.addEventListener('click', () => {
+    if (!isConnected() || !Ttt.matchId) return;
+    sendJSON({ action: 'ttt_leave', matchId: Ttt.matchId });
+});
+
+function handleTttMessage(msg) {
+    switch (msg.action) {
+        case 'ttt_created':
+            sendJSON({ action: 'ttt_join', matchId: msg.matchId, role: 'player' });
+            sendJSON({ action: 'ttt_list' });
+            break;
+
+        case 'ttt_state':
+            Ttt.matchId = msg.matchId;
+            if (msg.yourRole) Ttt.role = msg.yourRole;
+            if (msg.yourMark) Ttt.mark = msg.yourMark;
+            Ttt.state = msg.state;
+
+            tttRenderMatchHeader();
+            tttRenderStatus();
+            tttRenderBoard();
+            break;
+
+        case 'ttt_list':
+            tttRenderMatchList(msg.matches);
+            break;
+
+        case 'ttt_left':
+            resetTttState();
+            sendJSON({ action: 'ttt_list' });
+            break;
+
+        default:
+            console.warn('Unknown ttt message action:', msg);
+    }
+}
+
+function tttRenderMatchHeader() {
+    tttMatchTitle.textContent = `Match: ${Ttt.matchId}`;
+    tttRoleBadge.style.display = 'inline-block';
+    tttRoleBadge.textContent = Ttt.role === 'player' ? `Player (${Ttt.mark})` : 'Spectator';
+    tttLeaveBtn.style.display = 'inline-block';
+    tttGameBody.style.display = 'block';
+    tttEmptyState.style.display = 'none';
+}
+
+function tttRenderStatus() {
+    if (!Ttt.state) return;
+    const { turn, winner, status } = Ttt.state;
+
+    if (status === 'finished') {
+        if (winner === 'draw') {
+            tttStatusBanner.textContent = '🤝 Game ended in a Draw!';
+            tttStatusBanner.style.color = 'var(--text)';
+        } else if (Ttt.role === 'player' && winner === Ttt.mark) {
+            tttStatusBanner.textContent = '🎉 You Won!';
+            tttStatusBanner.style.color = 'var(--green)';
+        } else if (Ttt.role === 'player') {
+            tttStatusBanner.textContent = ' You Lost!';
+            tttStatusBanner.style.color = 'var(--red)';
+        } else {
+            tttStatusBanner.textContent = ` Player ${winner} Won!`;
+            tttStatusBanner.style.color = 'var(--accent)';
+        }
+    } else {
+        if (Ttt.role === 'player') {
+            if (turn === Ttt.mark) {
+                tttStatusBanner.textContent = `⚡ Your Turn (${Ttt.mark}) — Pick a cell!`;
+                tttStatusBanner.style.color = 'var(--accent)';
+            } else {
+                tttStatusBanner.textContent = ` Opponent's Turn (${turn})…`;
+                tttStatusBanner.style.color = 'var(--text-muted)';
+            }
+        } else {
+            tttStatusBanner.textContent = ` Spectating — Current Turn: ${turn}`;
+            tttStatusBanner.style.color = 'var(--purple)';
+        }
+    }
+}
+
+function tttRenderBoard() {
+    if (!Ttt.state) return;
+    tttBoard.innerHTML = '';
+
+    const isMyTurn = Ttt.role === 'player' && Ttt.mark === Ttt.state.turn && Ttt.state.status === 'in_progress';
+
+    Ttt.state.board.forEach((cellVal, index) => {
+        const cell = document.createElement('div');
+        cell.className = 'ttt-cell';
+
+        if (cellVal === 'X') {
+            cell.textContent = 'X';
+            cell.classList.add('mark-x', 'disabled');
+        } else if (cellVal === 'O') {
+            cell.textContent = 'O';
+            cell.classList.add('mark-o', 'disabled');
+        } else {
+            if (!isMyTurn) {
+                cell.classList.add('disabled');
+            } else {
+                cell.addEventListener('click', () => {
+                    sendJSON({
+                        action: 'ttt_move',
+                        matchId: Ttt.matchId,
+                        cell: index
+                    });
+                });
+            }
+        }
+        tttBoard.appendChild(cell);
+    });
+}
+
+function tttRenderMatchList(matches) {
+    tttMatchList.innerHTML = '';
+    if (!matches || matches.length === 0) {
+        tttMatchList.innerHTML = '<div class="log-empty">No active matches found.</div>';
+        return;
+    }
+
+    matches.forEach(m => {
+        const div = document.createElement('div');
+        div.className = 'room-item';
+        div.style.flexDirection = 'column';
+        div.style.alignItems = 'stretch';
+        div.style.gap = '8px';
+
+        const info = document.createElement('div');
+        info.className = 'room-header-info';
+        info.innerHTML = `<strong>${m.matchId}</strong> <span class="counter-badge">${m.status} · ${m.spectatorCount} spec</span>`;
+
+        const actions = document.createElement('div');
+        actions.className = 'ttt-match-actions';
+
+        const isPlayerInMatch = (Ttt.matchId === m.matchId && Ttt.role === 'player');
+
+        if (!isPlayerInMatch && (!m.players.X || !m.players.O) && m.status === 'in_progress') {
+            const playBtn = document.createElement('button');
+            playBtn.className = 'btn btn-sm btn-primary';
+            playBtn.textContent = 'Play';
+            playBtn.addEventListener('click', () => {
+                sendJSON({ action: 'ttt_join', matchId: m.matchId, role: 'player' });
+            });
+            actions.appendChild(playBtn);
+        }
+
+        const watchBtn = document.createElement('button');
+        watchBtn.className = 'btn btn-sm btn-ghost';
+        watchBtn.textContent = Ttt.matchId === m.matchId ? 'Viewing' : 'Watch';
+        if (Ttt.matchId === m.matchId) watchBtn.disabled = true;
+        watchBtn.addEventListener('click', () => {
+            sendJSON({ action: 'ttt_join', matchId: m.matchId, role: 'spectator' });
+        });
+        actions.appendChild(watchBtn);
+
+        div.appendChild(info);
+        div.appendChild(actions);
+        tttMatchList.appendChild(div);
+    });
 }
 
 /* ──────────────────────────────────────────────
