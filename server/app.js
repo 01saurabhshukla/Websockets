@@ -197,16 +197,35 @@ class WebSocketReceiver {
     _totalPayloadLength = 0; 
     _mask = Buffer.alloc(CONSTANTS.MASK_LENGTH); // this will hold the masking key set and sent by the client
     _framesReceived = 0; // tally of how many frames have been received related to our websocket message
-    _fragments = []; // store fragments (frames) for reassembly 
+    _fragments = []; // store fragments (frames) for reassembly
     _isAlive = true;
     _heartbeatTimer = null;
+    _closed = false; // true once this connection has sent/received a close frame or hit a fatal parse error
 
     processBuffer(chunk) {
+        // Once we've started closing this connection, ignore anything else that
+        // arrives on it (e.g. the client's own close-frame reply, or trailing
+        // bytes) instead of re-entering the parser on an already-ended socket.
+        if (this._closed) return;
+
         this._buffersArray.push(chunk);
         this._bufferedBytesLength += chunk.length;
 
         Logger.debug("Chunk received", { size: chunk.length });
-        this._startTaskLoop();
+
+        try {
+            this._startTaskLoop();
+        } catch (err) {
+            Logger.error("Error while parsing WebSocket frame; closing connection.", {
+                connectionId: this._connectionId,
+                error: err.stack || err.message || err
+            });
+            this._closed = true;
+            this.stopHeartbeat();
+            if (!this._socket.destroyed) {
+                this._socket.destroy();
+            }
+        }
     }
 
     _startTaskLoop() {
@@ -386,19 +405,7 @@ class WebSocketReceiver {
     }
 
     _consumeHeaders(size) {
-        this._bufferedBytesLength -= size;
-
-        if (size === this._buffersArray[0].length) {
-            return this._buffersArray.shift();
-        }
-
-        if (size < this._buffersArray[0].length) {
-            const infoBuffer = this._buffersArray[0];
-            this._buffersArray[0] = this._buffersArray[0].slice(size);
-            return infoBuffer.slice(0, size);
-        } else {
-            throw Error('You cannot extract more data from a ws frame than the actual frame size.');
-        }
+        return this._consumePayload(size);
     }
 
     _reset() {
@@ -419,6 +426,12 @@ class WebSocketReceiver {
     }
 
     _sendClose(closeCode, closeReason) {
+        // Guard against _sendClose() firing more than once for the same connection
+        // (e.g. we already closed it, and a late/second close frame from the client
+        // arrives and gets parsed again before the socket is fully torn down)
+        if (this._closed) return;
+        this._closed = true;
+
         let closureCode = (typeof closeCode !== 'undefined' && closeCode) ? closeCode : 1000;
         let closureReasonBuffer = (typeof closeReason !== 'undefined' && closeReason) ? Buffer.from(closeReason) : Buffer.from("Closure by server.");
 
@@ -432,8 +445,10 @@ class WebSocketReceiver {
 
         const closeFrame = Buffer.concat([mandatoryCloseHeaders, closeFramePayload]);
 
-        this._socket.write(closeFrame);
-        this._socket.end();
+        if (!this._socket.destroyed && !this._socket.writableEnded) {
+            this._socket.write(closeFrame);
+            this._socket.end();
+        }
 
         this.stopHeartbeat();
         this._reset();
@@ -493,7 +508,10 @@ class WebSocketReceiver {
         let closeCode = closeFramePayload.readUInt16BE();
         let closeReason = closeFramePayload.toString('utf8', 2);
         if (closeCode === 1001) {
-            this._socket.end();
+            this._closed = true;
+            if (!this._socket.destroyed && !this._socket.writableEnded) {
+                this._socket.end();
+            }
             this._reset();
             return;
         }
