@@ -125,24 +125,27 @@ class GameManager {
 
         const roomName = `ttt:${matchId}`;
 
+        let leavingMark = null;
         if (match.players.X === connectionId) {
+            leavingMark = 'X';
             match.players.X = null;
         }
         if (match.players.O === connectionId) {
+            leavingMark = 'O';
             match.players.O = null;
         }
 
         this.roomManager.leave(roomName, connectionId);
-        Logger.info('User left match', { matchId, connectionId });
+        Logger.info('User left match', { matchId, connectionId, leavingMark });
 
         const remainingMembers = this.roomManager.getMemberCount(roomName);
         if (remainingMembers === 0 && match.players.X === null && match.players.O === null) {
             this.matches.delete(matchId);
             Logger.info('TicTacToe match deleted (empty)', { matchId });
-            return { ok: true, state: null, matchDeleted: true };
+            return { ok: true, state: null, matchDeleted: true, leavingMark };
         }
 
-        return { ok: true, state: match.game.getState(), matchDeleted: false };
+        return { ok: true, state: match.game.getState(), matchDeleted: false, leavingMark };
     }
 
     leaveAllMatches(connectionId) {

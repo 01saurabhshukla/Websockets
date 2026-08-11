@@ -157,7 +157,27 @@ function startWebSocketConnection(socket) {
 
     socket.on('close', () => {
         receiver.stopHeartbeat();
-        gameManager.leaveAllMatches(connectionId);
+
+        const updatedMatches = gameManager.leaveAllMatches(connectionId);
+        for (const match of updatedMatches) {
+            if (match.matchDeleted || !match.state) continue;
+
+            const roomName = `ttt:${match.matchId}`;
+            roomManager.broadcast(roomName, JSON.stringify({
+                action: 'ttt_state',
+                matchId: match.matchId,
+                state: match.state
+            }), connectionId, sendFrame);
+
+            if (match.leavingMark) {
+                roomManager.broadcast(roomName, JSON.stringify({
+                    action: 'ttt_opponent_left',
+                    matchId: match.matchId,
+                    mark: match.leavingMark
+                }), connectionId, sendFrame);
+            }
+        }
+
         const leftRooms = roomManager.leaveAll(connectionId);
         connectionRegistry.unregister(connectionId);
 

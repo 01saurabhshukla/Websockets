@@ -742,6 +742,14 @@ function handleTttMessage(msg) {
             sendJSON({ action: 'ttt_list' });
             break;
 
+        case 'ttt_opponent_left':
+            if (msg.matchId === Ttt.matchId) {
+                tttStatusBanner.textContent = `🔌 Opponent (${msg.mark}) disconnected — game abandoned.`;
+                tttStatusBanner.style.color = 'var(--red)';
+                Array.from(tttBoard.children).forEach(cell => cell.classList.add('disabled'));
+            }
+            break;
+
         default:
             console.warn('Unknown ttt message action:', msg);
     }

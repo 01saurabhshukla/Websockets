@@ -266,6 +266,14 @@ class MessageRouter {
                 matchId: matchId,
                 state: result.state
             }), connectionId, this._sendFrame);
+
+            if (result.leavingMark) {
+                this._roomManager.broadcast(roomName, JSON.stringify({
+                    action: 'ttt_opponent_left',
+                    matchId: matchId,
+                    mark: result.leavingMark
+                }), connectionId, this._sendFrame);
+            }
         }
     }
 }
