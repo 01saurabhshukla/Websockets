@@ -2,26 +2,29 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>WebSocket Dev Client</title>
     <meta name="description"
-        content="Interactive WebSocket client for learning. Echo Mode shows raw protocol, Rooms Mode shows multi-client broadcasting.">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        content="Interactive WebSocket client for learning. Echo Mode shows raw protocol, Rooms Mode shows multi-client broadcasting, Tic-Tac-Toe shows server-authoritative match state." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="crossorigin" />
     <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
-        rel="stylesheet">
-    <link rel="stylesheet" href="client.css">
+        href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+        rel="stylesheet" />
+    <link rel="stylesheet" href="client.css" />
 </head>
 
 <body>
     <div id="app">
+
+        <!-- ══ APP BAR: identity + connection ══ -->
         <header id="site-header">
             <div class="logo">
                 <div class="logo-icon" aria-hidden="true">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round">
                         <path d="M5 12.55a11 11 0 0 1 14.08 0" />
                         <path d="M1.42 9a16 16 0 0 1 21.16 0" />
                         <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
@@ -30,290 +33,263 @@
                 </div>
                 <div>
                     <h1>WebSocket Dev Client</h1>
-                    <span class="logo-sub">ws://127.0.0.1:4000 &nbsp;·&nbsp; RFC 6455</span>
+                    <span class="logo-sub">ws://127.0.0.1:4000 · RFC 6455</span>
                 </div>
             </div>
 
-            <div id="mode-toggle" role="tablist" aria-label="Client mode">
-                <button class="mode-btn active" id="btn-echo-mode" role="tab" aria-selected="true"
-                    aria-controls="echo-ui">
-                    ⚡ Echo Mode
-                </button>
-                <button class="mode-btn" id="btn-rooms-mode" role="tab" aria-selected="false" aria-controls="rooms-ui">
-                    Rooms Mode
-                </button>
-                <button class="mode-btn" id="btn-ttt-mode" role="tab" aria-selected="false" aria-controls="ttt-ui">
-                    🎮 Tic-Tac-Toe
-                </button>
+            <div id="connection-bar">
+                <div class="conn-status">
+                    <span id="status-dot" class="status-dot" aria-hidden="true"></span>
+                    <span id="status-text" class="status-text">Not connected</span>
+                    <span id="conn-id-badge" class="conn-id-badge" aria-label="Connection ID"></span>
+                </div>
+                <div class="conn-actions">
+                    <button class="btn btn-primary" id="open-btn">Connect</button>
+                    <button class="btn btn-danger" id="close-btn" disabled="disabled">Disconnect</button>
+                </div>
             </div>
         </header>
 
-        <!-- ── MODE DESCRIPTION BANNER ── -->
-        <div id="mode-banner">
-            <div id="echo-banner" class="banner-text">
-                <strong>Echo Mode</strong> — bare WebSocket protocol. Connect, send any text, see it echoed back. No
-                rooms, no JSON, no extras. Start here to learn the protocol.
+        <!-- ══ MODE ROW: tabs + one-line explanation ══ -->
+        <div id="mode-row">
+            <div id="mode-toggle" role="tablist" aria-label="Client mode">
+                <button class="mode-btn active" id="btn-echo-mode" role="tab" aria-selected="true"
+                    aria-controls="echo-ui">Echo</button>
+                <button class="mode-btn" id="btn-rooms-mode" role="tab" aria-selected="false"
+                    aria-controls="rooms-ui">Rooms</button>
+                <button class="mode-btn" id="btn-ttt-mode" role="tab" aria-selected="false"
+                    aria-controls="ttt-ui">Tic-Tac-Toe</button>
             </div>
-            <div id="rooms-banner" class="banner-text" style="display:none;">
-                <strong>Rooms Mode</strong> — multi-client broadcasting. Join named rooms, send messages to rooms, and
-                see broadcasts from other users in real time.
-            </div>
-            <div id="ttt-banner" class="banner-text" style="display:none;">
-                <strong>Tic-Tac-Toe Mode</strong> — multiplayer match & live spectator system. Create or join matches as Player X/O or Spectator. Server validates every move in real time.
-            </div>
-        </div>
-
-        <!-- ── CONNECTION BAR ── -->
-        <div id="connection-bar">
-            <div class="conn-status">
-                <span id="status-dot" class="status-dot" aria-hidden="true"></span>
-                <span id="status-text" class="status-text">Not connected</span>
-                <span id="conn-id-badge" class="conn-id-badge" aria-label="Connection ID"></span>
-            </div>
-            <div class="conn-actions">
-                <button class="btn btn-primary" id="open-btn">Connect</button>
-                <button class="btn btn-danger" id="close-btn" disabled>Disconnect</button>
+            <div id="mode-banner">
+                <div id="echo-banner" class="banner-text">Bare protocol. Connect, send any text, watch the server echo
+                    the exact frame back.</div>
+                <div id="rooms-banner" class="banner-text" style="display:none;">Multi-client fan-out. Join rooms,
+                    broadcast to members, DM a single connection.</div>
+                <div id="ttt-banner" class="banner-text" style="display:none;">Server-authoritative match state. Play as
+                    X or O, or spectate a live board.</div>
             </div>
         </div>
 
-        <!-- ══════════════════════════════════
-             ECHO MODE
-        ══════════════════════════════════ -->
+        <!-- ══════════ ECHO MODE ══════════ -->
         <div id="echo-ui" role="tabpanel" aria-labelledby="btn-echo-mode">
 
-            <!-- log -->
-            <div class="card">
-                <div class="card-header">
-                    <span class="card-title">Frame Log</span>
-                    <div class="header-actions">
-                        <span id="echo-frame-count" class="counter-badge">0 frames</span>
-                        <button class="btn btn-sm btn-ghost" id="echo-clear-btn">Clear</button>
+            <div class="col-main">
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Frame Log</span>
+                        <div class="header-actions">
+                            <span id="echo-frame-count" class="counter-badge">0 frames</span>
+                            <button class="btn btn-sm btn-ghost" id="echo-clear-btn">Clear</button>
+                        </div>
                     </div>
-                </div>
-                <div id="echo-log" class="log-feed" role="log" aria-live="polite" aria-label="WebSocket frame log">
-                    <div class="log-empty">Connect to start logging frames…</div>
-                </div>
-                <div class="log-legend">
-                    <span class="legend-item sent">■ Sent</span>
-                    <span class="legend-item recv">■ Received</span>
-                    <span class="legend-item system">■ System</span>
-                    <span class="legend-item error">■ Error</span>
-                </div>
-            </div>
-
-            <!-- send form -->
-            <div class="card" id="echo-form-card">
-                <div class="card-header">
-                    <span class="card-title">Send Raw Message</span>
-                    <button class="btn btn-sm btn-ghost" id="populate-btn"
-                        title="Fill textarea with 150KB of data to test large frame handling">Fill 150 KB</button>
-                </div>
-                <div class="card-body">
-                    <textarea id="echo-message"
-                        placeholder="Type a message… the server will echo it back exactly as sent. Press Enter to send, Shift+Enter for a new line."
-                        disabled aria-label="Message to send" rows="4"></textarea>
-                    <div class="btn-row">
-                        <button class="btn btn-primary" id="echo-send-btn" disabled>Send</button>
-                        <span class="hint-text">Enter to send &nbsp;·&nbsp; Shift+Enter for newline</span>
+                    <div id="echo-log" class="log-feed" role="log" aria-live="polite" aria-label="WebSocket frame log">
+                        <div class="log-empty">no frames yet<br />connect, then send a message</div>
+                    </div>
+                    <div class="composer">
+                        <textarea id="echo-message" rows="3" disabled="disabled" aria-label="Message to send"
+                            placeholder="Type a message — the server echoes it back exactly as sent"></textarea>
+                        <div class="composer-row">
+                            <span class="hint-text">Enter to send · Shift+Enter newline</span>
+                            <button class="btn btn-primary" id="echo-send-btn" disabled="disabled">Send frame</button>
+                        </div>
                     </div>
                 </div>
             </div>
 
+            <div class="col-side">
+                <div class="card">
+                    <div class="card-header"><span class="card-title">Session</span></div>
+                    <dl class="session-list">
+                        <div class="session-row">
+                            <dt>Endpoint</dt>
+                            <dd id="session-endpoint">ws://127.0.0.1:4000</dd>
+                        </div>
+                        <div class="session-row">
+                            <dt>Connection ID</dt>
+                            <dd id="session-conn-id">—</dd>
+                        </div>
+                        <div class="session-row">
+                            <dt>Frames sent</dt>
+                            <dd id="session-sent" class="sent-val">0</dd>
+                        </div>
+                        <div class="session-row">
+                            <dt>Frames received</dt>
+                            <dd id="session-recv" class="recv-val">0</dd>
+                        </div>
+                    </dl>
+                </div>
+
+                <div class="card">
+                    <div class="card-header"><span class="card-title">Legend</span></div>
+                    <div class="log-legend">
+                        <span class="legend-item sent">Sent</span>
+                        <span class="legend-item recv">Received</span>
+                        <span class="legend-item system">System</span>
+                        <span class="legend-item error">Error</span>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header"><span class="card-title">Test payloads</span></div>
+                    <div class="card-body">
+                        <button class="btn btn-ghost btn-block" id="populate-btn"
+                            title="Fill the textarea with 150 KB of data to test large frame handling">Fill 150 KB
+                            payload</button>
+                        <span class="hint-text" style="white-space:normal; line-height:1.5;">Large frames test
+                            fragmentation on the wire.</span>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <!-- ══════════════════════════════════
-             ROOMS MODE
-        ══════════════════════════════════ -->
+        <!-- ══════════ ROOMS MODE ══════════ -->
         <div id="rooms-ui" role="tabpanel" aria-labelledby="btn-rooms-mode" style="display:none;">
 
-            <!-- ── SERVER OVERVIEW ── -->
-            <div id="server-overview">
-
-                <div class="card overview-card" id="users-panel">
+            <!-- rail: rooms + online users -->
+            <div class="col-rail">
+                <div class="card rail-rooms" id="all-rooms-panel">
                     <div class="card-header">
-                        <span class="card-title">🟢 Online Users</span>
-                        <div class="header-actions">
-                            <span id="users-count" class="counter-badge">—</span>
-                            <button class="btn btn-sm btn-ghost" id="refresh-users-btn" disabled>Refresh</button>
-                        </div>
-                    </div>
-                    <ul id="users-list" class="overview-list" aria-label="Online users" aria-live="polite">
-                        <li class="overview-empty">Connect to load…</li>
-                    </ul>
-                </div>
-
-                <div class="card overview-card" id="all-rooms-panel">
-                    <div class="card-header">
-                        <span class="card-title">🏠 All Rooms</span>
+                        <span class="card-title">Rooms</span>
                         <div class="header-actions">
                             <span id="all-rooms-count" class="counter-badge">—</span>
-                            <button class="btn btn-sm btn-ghost" id="refresh-all-rooms-btn" disabled>Refresh</button>
+                            <button class="btn btn-sm btn-ghost" id="refresh-all-rooms-btn"
+                                disabled="disabled">Refresh</button>
                         </div>
                     </div>
-                    <ul id="all-rooms-list" class="overview-list" aria-label="All server rooms" aria-live="polite">
-                        <li class="overview-empty">Connect to load…</li>
+                    <div class="composer" style="border-top:none; border-bottom:1px solid var(--rule);">
+                        <div class="input-row">
+                            <input type="text" id="join-room-input" placeholder="room name" disabled="disabled"
+                                aria-label="Room name to join" autocomplete="off" />
+                            <button class="btn btn-success btn-sm" id="join-btn" disabled="disabled">Join</button>
+                        </div>
+                    </div>
+                    <div class="scroll-area">
+                        <div class="subhead">
+                            Joined
+                            <button class="btn btn-sm btn-ghost" id="list-rooms-btn" disabled="disabled"
+                                style="float:right; margin-top:-4px;"
+                                title="Ask the server which rooms you are in">Sync</button>
+                        </div>
+                        <ul id="room-list" aria-label="Rooms you have joined" aria-live="polite">
+                            <li id="no-rooms-msg" class="no-rooms-msg">not in any room</li>
+                        </ul>
+                        <div class="subhead divided">On the server</div>
+                        <ul id="all-rooms-list" class="overview-list" aria-label="All server rooms" aria-live="polite">
+                            <li class="overview-empty">connect to load</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="card rail-users" id="users-panel">
+                    <div class="card-header">
+                        <span class="card-title">Online</span>
+                        <div class="header-actions">
+                            <span id="users-count" class="counter-badge">—</span>
+                            <button class="btn btn-sm btn-ghost" id="refresh-users-btn"
+                                disabled="disabled">Refresh</button>
+                        </div>
+                    </div>
+                    <ul id="users-list" class="overview-list scroll-area" aria-label="Online users" aria-live="polite">
+                        <li class="overview-empty">connect to load</li>
                     </ul>
                 </div>
-
             </div>
 
-
-            <!-- log -->
-            <div class="card">
-                <div class="card-header">
-                    <span class="card-title">Room Activity Log</span>
-                    <div class="header-actions">
-                        <span id="rooms-event-count" class="counter-badge">0 events</span>
-                        <button class="btn btn-sm btn-ghost" id="rooms-clear-btn">Clear</button>
-                    </div>
-                </div>
-                <div id="rooms-log" class="log-feed" role="log" aria-live="polite" aria-label="Room activity log">
-                    <div class="log-empty">Connect and join a room to see activity…</div>
-                </div>
-                <div class="log-legend">
-                    <span class="legend-item join"> Joined</span>
-                    <span class="legend-item leave"> Left</span>
-                    <span class="legend-item recv"> Message</span>
-                    <span class="legend-item sent"> Sent</span>
-                    <span class="legend-item error"> Error</span>
-                </div>
-            </div>
-
-            <!-- ── DIRECT MESSAGE ── -->
-            <div class="card" id="dm-card">
-                <div class="card-header">
-                    <span class="card-title"> DM Inbox</span>
-                    <button class="btn btn-sm btn-ghost" id="dm-clear-btn">Clear</button>
-                </div>
-
-                <!-- Recipient bar -->
-                <div id="dm-recipient-bar">
-                    <label class="field-label" for="dm-target">To</label>
-                    <input type="text" id="dm-target"
-                        placeholder="conn_2 — or click a user above"
-                        disabled autocomplete="off" aria-label="Target connection ID" />
-                </div>
-
-                <!-- Conversation log -->
-                <div id="dm-log" class="log-feed dm-log" role="log"
-                    aria-live="polite" aria-label="Direct message conversation">
-                    <div class="log-empty">No messages yet — select a user above or type a connection ID</div>
-                </div>
-
-                <!-- Typing indicator strip (hidden when empty) -->
-                <div id="dm-typing-strip" aria-live="polite" aria-label="Typing status"></div>
-
-                <!-- Send bar -->
-                <div id="dm-send-bar">
-                    <input type="text" id="dm-message"
-                        placeholder="Write a private message…"
-                        disabled aria-label="Direct message content" />
-                    <button class="btn btn-primary" id="dm-send-btn" disabled>Send DM</button>
-                </div>
-            </div>
-
-
-            <!-- rooms grid: sidebar + send panel -->
-            <div id="rooms-grid">
-
-                <!-- ── LEFT: JOIN + YOUR ROOMS ── -->
-                <div id="sidebar">
-
-                    <div class="card">
-                        <div class="card-header">
-                            <span class="card-title">Join a Room</span>
-                        </div>
-                        <div class="card-body">
-                            <div class="input-row">
-                                <input type="text" id="join-room-input" placeholder="room name" disabled
-                                    aria-label="Room name to join" autocomplete="off" />
-                                <button class="btn btn-success" id="join-btn" disabled>Join</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="card">
-                        <div class="card-header">
-                            <span class="card-title">Your Rooms</span>
-                            <button class="btn btn-sm btn-ghost" id="list-rooms-btn" disabled
-                                title="Ask server for the list of rooms you are in">Refresh</button>
-                        </div>
-                        <div class="card-body" style="padding: 0.5rem 0.875rem 0.875rem;">
-                            <ul id="room-list" aria-label="Rooms you have joined" aria-live="polite">
-                                <li id="no-rooms-msg" class="no-rooms-msg">Not in any rooms yet</li>
-                            </ul>
-                        </div>
-                    </div>
-
-                </div>
-
-                <!-- ── RIGHT: SEND TO ROOM ── -->
-                <div class="card" id="rooms-send-card">
+            <!-- main: room activity + broadcast composer -->
+            <div class="col-main">
+                <div class="card">
                     <div class="card-header">
-                        <span class="card-title">Send to Room</span>
+                        <span class="card-title">Room activity</span>
+                        <div class="header-actions">
+                            <span id="rooms-event-count" class="counter-badge">0 events</span>
+                            <button class="btn btn-sm btn-ghost" id="rooms-clear-btn">Clear</button>
+                        </div>
                     </div>
-                    <div class="card-body rooms-send-body">
-                        <div class="field-group">
-                            <label class="field-label" for="room-select-send">Target Room</label>
-                            <select id="room-select-send" disabled aria-label="Select room to send to">
+                    <div id="rooms-log" class="log-feed" role="log" aria-live="polite" aria-label="Room activity log">
+                        <div class="log-empty">no activity yet<br />join a room to see broadcasts</div>
+                    </div>
+                    <div class="composer">
+                        <div class="composer-row" style="justify-content:flex-start;">
+                            <label class="field-label" for="room-select-send">Broadcast to</label>
+                            <select id="room-select-send" disabled="disabled" aria-label="Select room to send to">
                                 <option value="">— join a room first —</option>
                             </select>
                         </div>
-                        <div class="field-group" style="flex:1; display:flex; flex-direction:column;">
-                            <label class="field-label" for="rooms-message">Message</label>
-                            <textarea id="rooms-message"
-                                placeholder="Type a message to broadcast to all members of the selected room…" disabled
-                                aria-label="Message to broadcast" style="flex:1; min-height: 120px;"></textarea>
-                        </div>
-                        <div class="btn-row">
-                            <button class="btn btn-primary" id="rooms-send-btn" disabled>Broadcast</button>
-                            <span class="hint-text">Enter to send &nbsp;·&nbsp; Shift+Enter for newline</span>
+                        <textarea id="rooms-message" rows="2" disabled="disabled" aria-label="Message to broadcast"
+                            placeholder="Message every member of the selected room…"></textarea>
+                        <div class="composer-row">
+                            <span class="hint-text">Enter to send · Shift+Enter newline</span>
+                            <button class="btn btn-primary" id="rooms-send-btn" disabled="disabled">Broadcast</button>
                         </div>
                     </div>
                 </div>
+            </div>
 
-            </div><!-- /#rooms-grid -->
+            <!-- dm column -->
+            <div class="col-dm">
+                <div class="card" id="dm-card">
+                    <div class="card-header">
+                        <span class="card-title">Direct message</span>
+                        <button class="btn btn-sm btn-ghost" id="dm-clear-btn">Clear</button>
+                    </div>
+                    <div id="dm-recipient-bar">
+                        <label class="field-label" for="dm-target">To</label>
+                        <input type="text" id="dm-target" placeholder="conn_2 — or pick a user" disabled="disabled"
+                            autocomplete="off" aria-label="Target connection ID" />
+                    </div>
+                    <div id="dm-log" class="log-feed" role="log" aria-live="polite"
+                        aria-label="Direct message conversation">
+                        <div class="log-empty">no private messages<br />pick a user to start</div>
+                    </div>
+                    <div id="dm-typing-strip" aria-live="polite" aria-label="Typing status"></div>
+                    <div class="composer">
+                        <div id="dm-send-bar">
+                            <input type="text" id="dm-message" placeholder="Private message…" disabled="disabled"
+                                aria-label="Direct message content" />
+                            <button class="btn btn-primary" id="dm-send-btn" disabled="disabled">Send</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-        </div><!-- /#rooms-ui -->
-
-        <!-- ══════════════════════════════════
-             TIC-TAC-TOE MODE
-        ══════════════════════════════════ -->
+        <!-- ══════════ TIC-TAC-TOE MODE ══════════ -->
         <div id="ttt-ui" role="tabpanel" aria-labelledby="btn-ttt-mode" style="display:none;">
-            <div class="rooms-layout">
-                <!-- Left Sidebar: Matches list & create -->
-                <div class="rooms-sidebar">
-                    <div class="card">
-                        <div class="card-header">
-                            <span class="card-title">Active Matches</span>
-                            <button class="btn btn-sm btn-ghost" id="ttt-refresh-btn" disabled>Refresh</button>
-                        </div>
-                        <div class="card-body">
-                            <button class="btn btn-primary" id="ttt-create-btn" disabled style="width:100%; margin-bottom:12px;">+ Create Match</button>
-                            <div id="ttt-match-list" class="room-list">
-                                <div class="log-empty">Connect and click refresh to load matches…</div>
-                            </div>
-                        </div>
+
+            <div class="col-rail">
+                <div class="card" style="flex:1;">
+                    <div class="card-header">
+                        <span class="card-title">Matches</span>
+                        <button class="btn btn-sm btn-ghost" id="ttt-refresh-btn" disabled="disabled">Refresh</button>
+                    </div>
+                    <div class="card-body" style="border-bottom:1px solid var(--rule);">
+                        <button class="btn btn-primary btn-block" id="ttt-create-btn" disabled="disabled">Create
+                            match</button>
+                    </div>
+                    <div id="ttt-match-list" class="scroll-area">
+                        <div class="log-empty">no active matches</div>
                     </div>
                 </div>
+            </div>
 
-                <!-- Right Main: Game board & match status -->
-                <div class="rooms-main">
-                    <div class="card">
-                        <div class="card-header">
-                            <div class="room-header-info">
-                                <span class="card-title" id="ttt-match-title">No Match Selected</span>
-                                <span id="ttt-role-badge" class="counter-badge" style="display:none;">-</span>
-                            </div>
-                            <button class="btn btn-sm btn-danger" id="ttt-leave-btn" style="display:none;">Leave Match</button>
+            <div class="col-main">
+                <div class="card" style="flex:1;">
+                    <div class="card-header">
+                        <div class="room-header-info">
+                            <span class="card-title" id="ttt-match-title">No match selected</span>
+                            <span id="ttt-role-badge" class="counter-badge" style="display:none;">-</span>
                         </div>
-                        <div class="card-body" id="ttt-game-body" style="display:none;">
-                            <div id="ttt-status-banner" class="ttt-status-banner">Waiting for players…</div>
-                            <div id="ttt-board" class="ttt-board"></div>
-                        </div>
-                        <div id="ttt-empty-state" class="card-body" style="text-align:center; padding: 40px 20px; color: var(--text-muted);">
-                            Create a new match or join an active match from the sidebar.
-                        </div>
+                        <button class="btn btn-sm btn-danger" id="ttt-leave-btn" style="display:none;">Leave
+                            match</button>
+                    </div>
+                    <div id="ttt-game-body" style="display:none;">
+                        <div id="ttt-status-banner" class="ttt-status-banner">Waiting for players…</div>
+                        <div id="ttt-board" class="ttt-board"></div>
+                    </div>
+                    <div id="ttt-empty-state">
+                        <div class="empty-title">No match selected</div>
+                        <div class="empty-body">Create a match to play as X, or watch a running one — the server
+                            validates every move and pushes state to all viewers.</div>
                     </div>
                 </div>
             </div>
@@ -322,6 +298,15 @@
     </div><!-- /#app -->
 
     <script src="client.js"></script>
+    <script>
+        /* One-time label — client.js updates the rest of the Session panel directly. */
+        (function () {
+            if (typeof WS_URL === 'string') {
+                document.getElementById('session-endpoint').textContent = WS_URL;
+                document.querySelector('.logo-sub').textContent = WS_URL + ' \u00b7 RFC 6455';
+            }
+        })();
+    </script>
 </body>
 
 </html>

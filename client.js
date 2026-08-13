@@ -7,15 +7,19 @@ let currentMode = 'echo';
 let myRooms = [];
 let echoCount = 0;
 let roomsCount = 0;
+let dmCount = 0;
+let sentFrameCount = 0;
+let recvFrameCount = 0;
 
-/* ──────────────────────────────────────────────
-   ELEMENT REFS — header / connection
-────────────────────────────────────────────── */
+/* ── refs: header / connection ── */
 const openBtn = document.getElementById('open-btn');
 const closeBtn = document.getElementById('close-btn');
 const statusDot = document.getElementById('status-dot');
 const statusText = document.getElementById('status-text');
 const connIdBadge = document.getElementById('conn-id-badge');
+const sessionConnId = document.getElementById('session-conn-id');
+const sessionSentCount = document.getElementById('session-sent');
+const sessionRecvCount = document.getElementById('session-recv');
 
 const btnEchoMode = document.getElementById('btn-echo-mode');
 const btnRoomsMode = document.getElementById('btn-rooms-mode');
@@ -31,9 +35,7 @@ const directTargetInput = document.getElementById('dm-target');
 const directMessageInput = document.getElementById('dm-message');
 const dmSendBtn = document.getElementById('dm-send-btn');
 
-/* ──────────────────────────────────────────────
-   ELEMENT REFS — tic tac toe mode
-────────────────────────────────────────────── */
+/* ── refs: tic-tac-toe ── */
 const tttCreateBtn = document.getElementById('ttt-create-btn');
 const tttRefreshBtn = document.getElementById('ttt-refresh-btn');
 const tttMatchList = document.getElementById('ttt-match-list');
@@ -45,13 +47,7 @@ const tttStatusBanner = document.getElementById('ttt-status-banner');
 const tttBoard = document.getElementById('ttt-board');
 const tttEmptyState = document.getElementById('ttt-empty-state');
 
-
-const testBtn = document.getElementById('test-button');
-
-
-/* ──────────────────────────────────────────────
-   ELEMENT REFS — echo mode
-────────────────────────────────────────────── */
+/* ── refs: echo ── */
 const echoLog = document.getElementById('echo-log');
 const echoMessage = document.getElementById('echo-message');
 const echoSendBtn = document.getElementById('echo-send-btn');
@@ -59,9 +55,7 @@ const echoClearBtn = document.getElementById('echo-clear-btn');
 const populateBtn = document.getElementById('populate-btn');
 const echoFrameCount = document.getElementById('echo-frame-count');
 
-/* ──────────────────────────────────────────────
-   ELEMENT REFS — rooms mode
-────────────────────────────────────────────── */
+/* ── refs: rooms ── */
 const roomsLog = document.getElementById('rooms-log');
 const joinInput = document.getElementById('join-room-input');
 const joinBtn = document.getElementById('join-btn');
@@ -74,8 +68,6 @@ const listRoomsBtn = document.getElementById('list-rooms-btn');
 const roomsClearBtn = document.getElementById('rooms-clear-btn');
 const roomsEventCount = document.getElementById('rooms-event-count');
 
-
-
 const usersList = document.getElementById('users-list');
 const usersCount = document.getElementById('users-count');
 const refreshUsersBtn = document.getElementById('refresh-users-btn');
@@ -83,17 +75,15 @@ const allRoomsList = document.getElementById('all-rooms-list');
 const allRoomsCount = document.getElementById('all-rooms-count');
 const refreshAllRoomsBtn = document.getElementById('refresh-all-rooms-btn');
 
-let myConnectionId = null;   // set on 'welcome'
-
 const dmLog = document.getElementById('dm-log');
 const dmClearBtn = document.getElementById('dm-clear-btn');
-
 const dmTypingStrip = document.getElementById('dm-typing-strip');
 
-const typingTimers = {};       // { connId: clearTimeoutId }
-let typingSendTimer = null;  // throttle: one send per 1.5 s max
+let myConnectionId = null;
+const typingTimers = {};
+let typingSendTimer = null;
 
-
+/* ── typing indicator ── */
 directMessageInput.addEventListener('input', () => {
     const to = directTargetInput.value.trim();
     if (!to || !isConnected() || to === myConnectionId) return;
@@ -104,7 +94,6 @@ directMessageInput.addEventListener('input', () => {
 });
 
 function showTypingIndicator(connId) {
-    // Reset (or start) the 3-second auto-clear for this typer
     clearTimeout(typingTimers[connId]);
     typingTimers[connId] = setTimeout(() => {
         delete typingTimers[connId];
@@ -113,7 +102,6 @@ function showTypingIndicator(connId) {
     renderTypingStrip();
 }
 
-
 function renderTypingStrip() {
     const typers = Object.keys(typingTimers);
     if (typers.length === 0) {
@@ -121,32 +109,24 @@ function renderTypingStrip() {
         dmTypingStrip.classList.remove('visible');
         return;
     }
-    // "conn_1", "conn_1 and conn_2", "conn_1, conn_2 and conn_3"
     let nameStr;
     if (typers.length === 1) nameStr = typers[0];
     else if (typers.length === 2) nameStr = `${typers[0]} and ${typers[1]}`;
-    else nameStr = typers.slice(0, -1).map(escapeHtml).join(', ') +
-        ' and ' + escapeHtml(typers[typers.length - 1]);
+    else nameStr = typers.slice(0, -1).join(', ') + ' and ' + typers[typers.length - 1];
     dmTypingStrip.innerHTML =
         `${escapeHtml(nameStr)} ${typers.length === 1 ? 'is' : 'are'} typing
          <span class="typing-dots"><span></span><span></span><span></span></span>`;
     dmTypingStrip.classList.add('visible');
 }
 
-
-/* ──────────────────────────────────────────────
-   MODE SWITCHING
-────────────────────────────────────────────── */
+/* ── mode switching ── */
 btnEchoMode.addEventListener('click', () => switchMode('echo'));
 btnRoomsMode.addEventListener('click', () => switchMode('rooms'));
 btnTttMode.addEventListener('click', () => switchMode('ttt'));
 
 function switchMode(mode) {
     currentMode = mode;
-
-    const isEcho = mode === 'echo';
-    const isRooms = mode === 'rooms';
-    const isTtt = mode === 'ttt';
+    const isEcho = mode === 'echo', isRooms = mode === 'rooms', isTtt = mode === 'ttt';
 
     btnEchoMode.classList.toggle('active', isEcho);
     btnRoomsMode.classList.toggle('active', isRooms);
@@ -164,14 +144,10 @@ function switchMode(mode) {
     roomsBanner.style.display = isRooms ? 'block' : 'none';
     tttBanner.style.display = isTtt ? 'block' : 'none';
 
-    if (isTtt && isConnected()) {
-        sendJSON({ action: 'ttt_list' });
-    }
+    if (isTtt && isConnected()) sendJSON({ action: 'ttt_list' });
 }
 
-/* ──────────────────────────────────────────────
-   STATUS HELPERS
-────────────────────────────────────────────── */
+/* ── status ── */
 function setStatus(state, msg) {
     statusDot.className = 'status-dot ' + state;
     statusText.className = 'status-text ' + state;
@@ -179,23 +155,20 @@ function setStatus(state, msg) {
 }
 
 function setConnected(url) {
-    setStatus('connected', `Connected → ${url}`);
+    setStatus('connected', 'Connected');
     openBtn.disabled = true;
     closeBtn.disabled = false;
 
-    // echo
     echoMessage.disabled = false;
     echoSendBtn.disabled = false;
 
-    // rooms
     joinInput.disabled = false;
     joinBtn.disabled = false;
     roomsMessage.disabled = false;
     roomsSendBtn.disabled = false;
     listRoomsBtn.disabled = false;
-    roomSelectSend.disabled = false
+    roomSelectSend.disabled = false;
 
-    // DM
     directTargetInput.disabled = false;
     directMessageInput.disabled = false;
     dmSendBtn.disabled = false;
@@ -203,25 +176,21 @@ function setConnected(url) {
     refreshUsersBtn.disabled = false;
     refreshAllRoomsBtn.disabled = false;
 
-    // Tic-Tac-Toe
     tttCreateBtn.disabled = false;
     tttRefreshBtn.disabled = false;
-    if (currentMode === 'ttt') {
-        sendJSON({ action: 'ttt_list' });
-    }
+    if (currentMode === 'ttt') sendJSON({ action: 'ttt_list' });
 }
 
 function setDisconnected(msg) {
-    setStatus('disconnected', msg || 'Disconnected');
+    setStatus('disconnected', msg || 'Not connected');
     openBtn.disabled = false;
     closeBtn.disabled = true;
     connIdBadge.style.display = 'none';
+    sessionConnId.textContent = '—';
 
-    // echo
     echoMessage.disabled = true;
     echoSendBtn.disabled = true;
 
-    // rooms
     joinInput.disabled = true;
     joinBtn.disabled = true;
     roomsMessage.disabled = true;
@@ -229,7 +198,6 @@ function setDisconnected(msg) {
     listRoomsBtn.disabled = true;
     roomSelectSend.disabled = true;
 
-    // DM
     directTargetInput.disabled = true;
     directMessageInput.disabled = true;
     dmSendBtn.disabled = true;
@@ -237,23 +205,15 @@ function setDisconnected(msg) {
     refreshUsersBtn.disabled = true;
     refreshAllRoomsBtn.disabled = true;
 
-    // Tic-Tac-Toe
     tttCreateBtn.disabled = true;
     tttRefreshBtn.disabled = true;
     resetTttState();
 
-    // clear room UI state
     myRooms = [];
     refreshRoomList();
 }
 
-
-/* 
-    New Features
-*/
-
-
-// ── Refresh buttons ──
+/* ── server overview ── */
 refreshUsersBtn.addEventListener('click', () => sendJSON({ action: 'list_all_users' }));
 refreshAllRoomsBtn.addEventListener('click', () => sendJSON({ action: 'list_all_rooms' }));
 
@@ -261,19 +221,18 @@ function renderUsers(users) {
     usersList.innerHTML = '';
     usersCount.textContent = `${users.length} online`;
     if (users.length === 0) {
-        usersList.innerHTML = '<li class="overview-empty">No users online</li>';
+        usersList.innerHTML = '<li class="overview-empty">no users online</li>';
         return;
     }
     users.forEach(id => {
         const li = document.createElement('li');
         li.className = 'user-pill' + (id === myConnectionId ? ' is-me' : '');
         li.innerHTML = `<span class="uid">${escapeHtml(id)}</span>
-                        <span class="dm-cta">${id !== myConnectionId ? '→ DM' : ''}</span>`;
+                        <span class="dm-cta">${id !== myConnectionId ? 'DM' : ''}</span>`;
         if (id !== myConnectionId) {
             li.addEventListener('click', () => {
                 directTargetInput.value = id;
-                directMessageInput.focus();
-                document.getElementById('dm-card').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                directMessageInput.focus();   // [fix] focus instead of scrollIntoView
             });
         }
         usersList.appendChild(li);
@@ -284,56 +243,56 @@ function renderAllRooms(rooms) {
     allRoomsList.innerHTML = '';
     allRoomsCount.textContent = `${rooms.length} room${rooms.length !== 1 ? 's' : ''}`;
     if (rooms.length === 0) {
-        allRoomsList.innerHTML = '<li class="overview-empty">No rooms yet</li>';
+        allRoomsList.innerHTML = '<li class="overview-empty">no rooms yet</li>';
         return;
     }
     rooms.forEach(name => {
         const li = document.createElement('li');
         li.className = 'room-pill';
         li.textContent = `# ${name}`;
-        li.addEventListener('click', () => {
-            joinInput.value = name;
-            joinInput.focus();
-        });
+        li.addEventListener('click', () => { joinInput.value = name; joinInput.focus(); });
         allRoomsList.appendChild(li);
     });
 }
 
-
-
-/* ──────────────────────────────────────────────
-   LOGGING HELPERS
-────────────────────────────────────────────── */
+/* ── logging ── */
 function createEntry(type, label, text) {
     const el = document.createElement('div');
     el.className = `log-entry ${type}`;
     const ts = new Date().toLocaleTimeString('en-GB', { hour12: false });
     el.innerHTML =
-        `<span class="log-label">${label}</span>` +
+        `<span class="log-label">${escapeHtml(label)}</span>` +
         `<span class="log-ts">${ts}</span>` +
-        escapeHtml(text);
+        `<span>${escapeHtml(text)}</span>`;
     return el;
 }
 
 function appendToEcho(type, label, text) {
-    // Remove the empty placeholder if present
     const empty = echoLog.querySelector('.log-empty');
     if (empty) empty.remove();
-
     echoLog.appendChild(createEntry(type, label, text));
     echoLog.scrollTop = echoLog.scrollHeight;
     echoCount++;
     echoFrameCount.textContent = `${echoCount} frame${echoCount !== 1 ? 's' : ''}`;
+    if (type === 'sent') sessionSentCount.textContent = ++sentFrameCount;
+    else if (type === 'recv') sessionRecvCount.textContent = ++recvFrameCount;
 }
 
 function appendToRooms(type, label, text) {
     const empty = roomsLog.querySelector('.log-empty');
     if (empty) empty.remove();
-
     roomsLog.appendChild(createEntry(type, label, text));
     roomsLog.scrollTop = roomsLog.scrollHeight;
     roomsCount++;
     roomsEventCount.textContent = `${roomsCount} event${roomsCount !== 1 ? 's' : ''}`;
+}
+
+function appendToDm(type, label, text) {
+    const empty = dmLog.querySelector('.log-empty');
+    if (empty) empty.remove();
+    dmLog.appendChild(createEntry(type, label, text));
+    dmLog.scrollTop = dmLog.scrollHeight;
+    dmCount++;
 }
 
 function escapeHtml(str) {
@@ -344,15 +303,9 @@ function escapeHtml(str) {
         .replace(/"/g, '&quot;');
 }
 
-/* ──────────────────────────────────────────────
-   ROOM LIST UI
-────────────────────────────────────────────── */
+/* ── room list UI ── */
 function refreshRoomList() {
-    // Remove all room items (keep the no-rooms-msg node)
-    const items = roomList.querySelectorAll('.room-item');
-    items.forEach(el => el.remove());
-
-    // Rebuild the select dropdown
+    roomList.querySelectorAll('.room-item').forEach(el => el.remove());
     roomSelectSend.innerHTML = '';
 
     if (myRooms.length === 0) {
@@ -367,7 +320,6 @@ function refreshRoomList() {
     noRoomsMsg.style.display = 'none';
 
     myRooms.forEach(room => {
-        // Sidebar list item
         const li = document.createElement('li');
         li.className = 'room-item';
 
@@ -385,7 +337,6 @@ function refreshRoomList() {
         li.appendChild(leaveBtn);
         roomList.appendChild(li);
 
-        // Select option
         const opt = document.createElement('option');
         opt.value = room;
         opt.textContent = `# ${room}`;
@@ -393,81 +344,65 @@ function refreshRoomList() {
     });
 }
 
-/* ──────────────────────────────────────────────
-   WEBSOCKET
-────────────────────────────────────────────── */
+/* ── websocket ── */
 openBtn.addEventListener('click', () => {
+    console.log("clicked:")
     if (socket && socket.readyState < 2) return;
 
     setStatus('connecting', 'Connecting…');
     openBtn.disabled = true;
-
+    console.log(WS_URL);
     socket = new WebSocket(WS_URL);
 
     socket.onopen = () => {
         setConnected(WS_URL);
-        appendToEcho('system', 'SYS', `Connection opened → ${WS_URL}`);
-        appendToRooms('system', 'SYS', `Connection opened → ${WS_URL}`);
+        appendToEcho('system', 'sys', `Connection opened → ${WS_URL}`);
+        appendToRooms('system', 'sys', `Connection opened → ${WS_URL}`);
     };
 
     socket.onmessage = (event) => {
         const raw = event.data;
 
         if (raw instanceof Blob) {
-            // Binary frame — show in echo log
             raw.text().then(text => {
-                appendToEcho('recv', 'RECV (binary)', `[${text.length} bytes] ${text.substring(0, 200)}${text.length > 200 ? '…' : ''}`);
+                appendToEcho('recv', 'bin', `[${text.length} bytes] ${text.substring(0, 200)}${text.length > 200 ? '…' : ''}`);
             });
             return;
         }
 
-        // Try JSON — all rooms messages are JSON
         let parsed = null;
         try { parsed = JSON.parse(raw); } catch (_) { }
-        console.log("parsed", parsed);
+
         if (parsed && parsed.action) {
-            if (parsed.action.startsWith('ttt_')) {
-                handleTttMessage(parsed);
-            } else {
-                handleRoomsMessage(parsed);
-            }
-            // Also show raw in echo log (so echo mode users can observe the protocol)
-            appendToEcho('recv', 'RECV', raw.length > 200 ? raw.substring(0, 200) + '…' : raw);
+            if (parsed.action.startsWith('ttt_')) handleTttMessage(parsed);
+            else handleRoomsMessage(parsed);
+            appendToEcho('recv', 'recv', raw.length > 200 ? raw.substring(0, 200) + '…' : raw);
         } else {
-            // Plain echo
-            appendToEcho('recv', 'RECV', raw.length > 300 ? raw.substring(0, 300) + `… [${raw.length} bytes total]` : raw);
-            appendToRooms('recv', 'RECV', raw);
+            appendToEcho('recv', 'recv', raw.length > 300 ? raw.substring(0, 300) + `… [${raw.length} bytes total]` : raw);
+            appendToRooms('recv', 'recv', raw);
         }
     };
 
     socket.onclose = (ev) => {
         const reason = ev.reason ? ev.reason : `code ${ev.code}`;
-        appendToEcho('system', 'SYS', `Connection closed — ${reason}`);
-        appendToRooms('system', 'SYS', `Connection closed — ${reason}`);
-        setDisconnected(`Disconnected (${reason})`);
+        appendToEcho('system', 'sys', `Connection closed — ${reason}`);
+        appendToRooms('system', 'sys', `Connection closed — ${reason}`);
+        setDisconnected('Disconnected');
     };
 
     socket.onerror = () => {
-        appendToEcho('error', 'ERR', 'WebSocket error — is the server running on port 4000?');
-        appendToRooms('error', 'ERR', 'WebSocket error — is the server running on port 4000?');
+        appendToEcho('error', 'err', 'WebSocket error — is the server running on port 4000?');
+        appendToRooms('error', 'err', 'WebSocket error — is the server running on port 4000?');
         setDisconnected('Connection error');
     };
 });
 
-closeBtn.addEventListener('click', () => {
-    if (socket) socket.close(1000, 'Client disconnected');
-});
+closeBtn.addEventListener('click', () => { if (socket) socket.close(1000, 'Client disconnected'); });
 
-/* ──────────────────────────────────────────────
-   ECHO MODE — SEND
-────────────────────────────────────────────── */
+/* ── echo ── */
 echoSendBtn.addEventListener('click', sendEchoMessage);
-
 echoMessage.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendEchoMessage();
-    }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendEchoMessage(); }
 });
 
 function sendEchoMessage() {
@@ -475,31 +410,25 @@ function sendEchoMessage() {
     if (!text || !isConnected()) return;
     socket.send(text);
     const preview = text.length > 200 ? text.substring(0, 200) + `… [${text.length} bytes]` : text;
-    appendToEcho('sent', 'SENT', preview);
+    appendToEcho('sent', 'sent', preview);
     echoMessage.value = '';
 }
 
 populateBtn.addEventListener('click', () => {
-    echoMessage.value = 'A'.repeat(150_000);
+    echoMessage.value = 'A'.repeat(150000);
     echoMessage.focus();
 });
 
 echoClearBtn.addEventListener('click', () => {
-    echoLog.innerHTML = '<div class="log-empty">Log cleared</div>';
+    echoLog.innerHTML = '<div class="log-empty">log cleared</div>';
     echoCount = 0;
     echoFrameCount.textContent = '0 frames';
 });
 
-/* ──────────────────────────────────────────────
-   DIRECT MESSAGING
-────────────────────────────────────────────── */
+/* ── direct messages ── */
 dmSendBtn.addEventListener('click', sendDirect);
-
 directMessageInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendDirect();
-    }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendDirect(); }
 });
 
 function sendDirect() {
@@ -507,22 +436,14 @@ function sendDirect() {
     const text = directMessageInput.value.trim();
     if (!to || !text) return;
     sendJSON({ action: 'direct', to, text });
-    appendToRooms('sent', 'DM', `→ [${to}] ${text}`);
+    appendToDm('sent', `→ ${to}`, text);   // [fix] DMs render in the DM panel, not the room log
     directMessageInput.value = '';
 }
 
-/* ──────────────────────────────────────────────
-   ROOMS MODE — ACTIONS
-────────────────────────────────────────────── */
-function sendJSON(obj) {
-    if (isConnected()) socket.send(JSON.stringify(obj));
-}
+/* ── rooms ── */
+function sendJSON(obj) { if (isConnected()) socket.send(JSON.stringify(obj)); }
+function isConnected() { return socket && socket.readyState === WebSocket.OPEN; }
 
-function isConnected() {
-    return socket && socket.readyState === WebSocket.OPEN;
-}
-
-// ── Join ──
 joinBtn.addEventListener('click', joinCurrentRoom);
 joinInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') joinCurrentRoom(); });
 
@@ -530,24 +451,19 @@ function joinCurrentRoom() {
     const room = joinInput.value.trim();
     if (!room) return;
     sendJSON({ action: 'join', room });
-    appendToRooms('sent', 'SEND', `→ join "${room}"`);
+    appendToRooms('sent', 'send', `→ join "${room}"`);
     joinInput.value = '';
     joinInput.focus();
 }
 
-// ── Leave (from sidebar button) ──
 function leaveRoom(room) {
     sendJSON({ action: 'leave', room });
-    appendToRooms('sent', 'SEND', `→ leave "${room}"`);
+    appendToRooms('sent', 'send', `→ leave "${room}"`);
 }
 
-// ── Broadcast ──
 roomsSendBtn.addEventListener('click', sendRoomMessage);
 roomsMessage.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendRoomMessage();
-    }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendRoomMessage(); }
 });
 
 function sendRoomMessage() {
@@ -555,115 +471,85 @@ function sendRoomMessage() {
     const text = roomsMessage.value.trim();
     if (!room || !text) return;
     sendJSON({ action: 'message', room, text });
-    appendToRooms('sent', 'ME', `[#${room}] ${text}`);
+    appendToRooms('sent', 'me', `[#${room}] ${text}`);
     roomsMessage.value = '';
-};
-
-!testBtn ?? testBtn.addEventListener('click', () => {
-    sendJSON({ action: 'list_all_rooms' });
-});
+}
 
 listRoomsBtn.addEventListener('click', () => {
     sendJSON({ action: 'list_rooms' });
-    appendToRooms('system', 'SEND', '→ list_rooms');
+    appendToRooms('system', 'send', '→ list_rooms');
 });
 
 roomsClearBtn.addEventListener('click', () => {
-    roomsLog.innerHTML = '<div class="log-empty">Log cleared</div>';
+    roomsLog.innerHTML = '<div class="log-empty">log cleared</div>';
     roomsCount = 0;
     roomsEventCount.textContent = '0 events';
 });
 
-function appendToDm(type, label, text) {
-    const empty = dmLog.querySelector('.log-empty');
-    if (empty) empty.remove();
-    dmLog.appendChild(createEntry(type, label, text));
-    dmLog.scrollTop = dmLog.scrollHeight;
-    dmCount++;
-}
-
 dmClearBtn.addEventListener('click', () => {
-    dmLog.innerHTML = '<div class="log-empty">Log cleared</div>';
+    dmLog.innerHTML = '<div class="log-empty">log cleared</div>';
     dmCount = 0;
 });
 
-
-/* ──────────────────────────────────────────────
-   ROOMS — INCOMING MESSAGE HANDLER
-────────────────────────────────────────────── */
+/* ── incoming: rooms ── */
 function handleRoomsMessage(msg) {
-    console.log("console message : ", msg.action);
     switch (msg.action) {
-
         case 'joined':
             if (!myRooms.includes(msg.room)) myRooms.push(msg.room);
             refreshRoomList();
-            appendToRooms('join', 'JOINED', `You joined #${msg.room} — ${msg.members} member${msg.members !== 1 ? 's' : ''}`);
+            appendToRooms('join', 'joined', `You joined #${msg.room} — ${msg.members} member${msg.members !== 1 ? 's' : ''}`);
             break;
 
         case 'left':
             myRooms = myRooms.filter(r => r !== msg.room);
             refreshRoomList();
-            appendToRooms('leave', 'LEFT', `You left #${msg.room}`);
+            appendToRooms('leave', 'left', `You left #${msg.room}`);
             break;
 
         case 'message':
-            appendToRooms('recv', 'MSG', `[#${msg.room}] ${msg.from}: ${msg.text}`);
+            appendToRooms('recv', 'msg', `[#${msg.room}] ${msg.from}: ${msg.text}`);
             break;
 
         case 'user_joined':
-            appendToRooms('join', 'JOIN', `${msg.userId} joined #${msg.room} (${msg.members} members)`);
+            appendToRooms('join', 'join', `${msg.userId} joined #${msg.room} (${msg.members} members)`);
             break;
 
         case 'user_left':
-            appendToRooms('leave', 'LEFT', `${msg.userId} left #${msg.room} (${msg.members} remaining)`);
+            appendToRooms('leave', 'left', `${msg.userId} left #${msg.room} (${msg.members} remaining)`);
             break;
 
-        case 'room_list': {
-            const list = msg.rooms.length
-                ? msg.rooms.map(r => '#' + r).join(', ')
-                : '(none)';
-            appendToRooms('system', 'ROOMS', `Your rooms: ${list}`);
+        case 'room_list':
+            appendToRooms('system', 'rooms', `Your rooms: ${msg.rooms.length ? msg.rooms.map(r => '#' + r).join(', ') : '(none)'}`);
             break;
-        }
 
-        case 'all_rooms_list': {
-            const all = msg.rooms.length
-                ? msg.rooms.map(r => '#' + r).join(', ')
-                : '(none — no rooms exist on server yet)';
+        case 'all_rooms_list':
             renderAllRooms(msg.rooms);
-            appendToRooms('system', 'ALL-ROOMS', `All server rooms: ${all}`);
+            appendToRooms('system', 'rooms', `All server rooms: ${msg.rooms.length ? msg.rooms.map(r => '#' + r).join(', ') : '(none)'}`);
             break;
-        }
 
         case 'welcome':
             myConnectionId = msg.connectionId;
             connIdBadge.textContent = `ID: ${msg.connectionId}`;
             connIdBadge.style.display = 'inline';
-            appendToRooms('system', 'SYS', `Your connection ID: ${msg.connectionId}`);
-            appendToEcho('system', 'SYS', `Your connection ID: ${msg.connectionId}`);
+            sessionConnId.textContent = msg.connectionId;
+            appendToRooms('system', 'sys', `Your connection ID: ${msg.connectionId}`);
+            appendToEcho('system', 'sys', `Your connection ID: ${msg.connectionId}`);
             break;
 
         case 'all_users':
             renderUsers(msg.users);
             break;
 
-        case 'all_rooms_list':
-
-            break;
-
         case 'direct':
-            // When we receive a direct message from anyone
-            appendToRooms('recv', 'DM', `${msg.from}: ${msg.text}`);
+            appendToDm('dm', msg.from, msg.text);   // [fix] into the DM panel
             break;
 
-        // Delievery Recipt from server
         case 'direct_sent':
-            appendToRooms('sent', 'DM', `Delivered to ${msg.to}`);
+            appendToDm('system', 'ok', `Delivered to ${msg.to}`);
             break;
 
         case 'error':
-            appendToRooms('error', 'ERR', msg.message);
+            appendToRooms('error', 'err', msg.message);
             break;
 
         case 'typing':
@@ -671,48 +557,27 @@ function handleRoomsMessage(msg) {
             break;
 
         default:
-            appendToRooms('system', 'RECV', JSON.stringify(msg));
+            appendToRooms('system', 'recv', JSON.stringify(msg));
     }
 }
 
-/* ──────────────────────────────────────────────
-   TIC-TAC-TOE CLIENT LOGIC
-────────────────────────────────────────────── */
-const Ttt = {
-    matchId: null,
-    role: null,
-    mark: null,
-    state: null
-};
+/* ── tic-tac-toe ── */
+const Ttt = { matchId: null, role: null, mark: null, state: null };
 
 function resetTttState() {
-    Ttt.matchId = null;
-    Ttt.role = null;
-    Ttt.mark = null;
-    Ttt.state = null;
-
-    tttMatchTitle.textContent = 'No Match Selected';
+    Ttt.matchId = null; Ttt.role = null; Ttt.mark = null; Ttt.state = null;
+    tttMatchTitle.textContent = 'No match selected';
     tttRoleBadge.style.display = 'none';
     tttLeaveBtn.style.display = 'none';
     tttGameBody.style.display = 'none';
     tttEmptyState.style.display = 'block';
-    tttMatchList.innerHTML = '<div class="log-empty">Connect and click refresh to load matches…</div>';
+    tttMatchList.innerHTML = '<div class="log-empty">no active matches</div>';
 }
 
-tttCreateBtn.addEventListener('click', () => {
-    if (!isConnected()) return;
-    console.log("Button Clicked");
-    sendJSON({ action: 'ttt_create' });
-});
-
-tttRefreshBtn.addEventListener('click', () => {
-    if (!isConnected()) return;
-    sendJSON({ action: 'ttt_list' });
-});
-
+tttCreateBtn.addEventListener('click', () => { if (isConnected()) sendJSON({ action: 'ttt_create' }); });
+tttRefreshBtn.addEventListener('click', () => { if (isConnected()) sendJSON({ action: 'ttt_list' }); });
 tttLeaveBtn.addEventListener('click', () => {
-    if (!isConnected() || !Ttt.matchId) return;
-    sendJSON({ action: 'ttt_leave', matchId: Ttt.matchId });
+    if (isConnected() && Ttt.matchId) sendJSON({ action: 'ttt_leave', matchId: Ttt.matchId });
 });
 
 function handleTttMessage(msg) {
@@ -727,7 +592,6 @@ function handleTttMessage(msg) {
             if (msg.yourRole) Ttt.role = msg.yourRole;
             if (msg.yourMark) Ttt.mark = msg.yourMark;
             Ttt.state = msg.state;
-
             tttRenderMatchHeader();
             tttRenderStatus();
             tttRenderBoard();
@@ -744,7 +608,7 @@ function handleTttMessage(msg) {
 
         case 'ttt_opponent_left':
             if (msg.matchId === Ttt.matchId) {
-                tttStatusBanner.textContent = `🔌 Opponent (${msg.mark}) disconnected — game abandoned.`;
+                tttStatusBanner.textContent = `Opponent (${msg.mark}) disconnected — game abandoned`;
                 tttStatusBanner.style.color = 'var(--red)';
                 Array.from(tttBoard.children).forEach(cell => cell.classList.add('disabled'));
             }
@@ -756,10 +620,10 @@ function handleTttMessage(msg) {
 }
 
 function tttRenderMatchHeader() {
-    tttMatchTitle.textContent = `Match: ${Ttt.matchId}`;
+    tttMatchTitle.textContent = Ttt.matchId;
     tttRoleBadge.style.display = 'inline-block';
-    tttRoleBadge.textContent = Ttt.role === 'player' ? `Player (${Ttt.mark})` : 'Spectator';
-    tttLeaveBtn.style.display = 'inline-block';
+    tttRoleBadge.textContent = Ttt.role === 'player' ? `Player ${Ttt.mark}` : 'Spectator';
+    tttLeaveBtn.style.display = 'inline-flex';
     tttGameBody.style.display = 'block';
     tttEmptyState.style.display = 'none';
 }
@@ -770,31 +634,29 @@ function tttRenderStatus() {
 
     if (status === 'finished') {
         if (winner === 'draw') {
-            tttStatusBanner.textContent = '🤝 Game ended in a Draw!';
-            tttStatusBanner.style.color = 'var(--text)';
+            tttStatusBanner.textContent = 'Draw — board full';
+            tttStatusBanner.style.color = 'var(--muted)';
         } else if (Ttt.role === 'player' && winner === Ttt.mark) {
-            tttStatusBanner.textContent = '🎉 You Won!';
+            tttStatusBanner.textContent = 'You won';
             tttStatusBanner.style.color = 'var(--green)';
         } else if (Ttt.role === 'player') {
-            tttStatusBanner.textContent = ' You Lost!';
+            tttStatusBanner.textContent = 'You lost';
             tttStatusBanner.style.color = 'var(--red)';
         } else {
-            tttStatusBanner.textContent = ` Player ${winner} Won!`;
-            tttStatusBanner.style.color = 'var(--accent)';
+            tttStatusBanner.textContent = `Player ${winner} won`;
+            tttStatusBanner.style.color = 'var(--ink)';
+        }
+    } else if (Ttt.role === 'player') {
+        if (turn === Ttt.mark) {
+            tttStatusBanner.textContent = `Your turn (${Ttt.mark}) — pick a cell`;
+            tttStatusBanner.style.color = 'var(--ink)';
+        } else {
+            tttStatusBanner.textContent = `Opponent's turn (${turn})…`;
+            tttStatusBanner.style.color = 'var(--muted)';
         }
     } else {
-        if (Ttt.role === 'player') {
-            if (turn === Ttt.mark) {
-                tttStatusBanner.textContent = `⚡ Your Turn (${Ttt.mark}) — Pick a cell!`;
-                tttStatusBanner.style.color = 'var(--accent)';
-            } else {
-                tttStatusBanner.textContent = ` Opponent's Turn (${turn})…`;
-                tttStatusBanner.style.color = 'var(--text-muted)';
-            }
-        } else {
-            tttStatusBanner.textContent = ` Spectating — Current Turn: ${turn}`;
-            tttStatusBanner.style.color = 'var(--purple)';
-        }
+        tttStatusBanner.textContent = `Spectating — ${turn} to move`;
+        tttStatusBanner.style.color = 'var(--purple)';
     }
 }
 
@@ -808,24 +670,15 @@ function tttRenderBoard() {
         const cell = document.createElement('div');
         cell.className = 'ttt-cell';
 
-        if (cellVal === 'X') {
-            cell.textContent = 'X';
-            cell.classList.add('mark-x', 'disabled');
-        } else if (cellVal === 'O') {
-            cell.textContent = 'O';
-            cell.classList.add('mark-o', 'disabled');
+        if (cellVal === 'X' || cellVal === 'O') {
+            cell.textContent = cellVal;
+            cell.classList.add(cellVal === 'X' ? 'mark-x' : 'mark-o', 'disabled');
+        } else if (!isMyTurn) {
+            cell.classList.add('disabled');
         } else {
-            if (!isMyTurn) {
-                cell.classList.add('disabled');
-            } else {
-                cell.addEventListener('click', () => {
-                    sendJSON({
-                        action: 'ttt_move',
-                        matchId: Ttt.matchId,
-                        cell: index
-                    });
-                });
-            }
+            cell.addEventListener('click', () => {
+                sendJSON({ action: 'ttt_move', matchId: Ttt.matchId, cell: index });
+            });
         }
         tttBoard.appendChild(cell);
     });
@@ -834,27 +687,25 @@ function tttRenderBoard() {
 function tttRenderMatchList(matches) {
     tttMatchList.innerHTML = '';
     if (!matches || matches.length === 0) {
-        tttMatchList.innerHTML = '<div class="log-empty">No active matches found.</div>';
+        tttMatchList.innerHTML = '<div class="log-empty">no active matches</div>';
         return;
     }
 
     matches.forEach(m => {
         const div = document.createElement('div');
         div.className = 'room-item';
-        div.style.flexDirection = 'column';
-        div.style.alignItems = 'stretch';
-        div.style.gap = '8px';
 
         const info = document.createElement('div');
         info.className = 'room-header-info';
-        info.innerHTML = `<strong>${m.matchId}</strong> <span class="counter-badge">${m.status} · ${m.spectatorCount} spec</span>`;
+        info.innerHTML = `<span>${escapeHtml(m.matchId)}</span>` +
+            `<span class="counter-badge">${escapeHtml(m.status)} · ${m.spectatorCount} spec</span>`;
 
         const actions = document.createElement('div');
         actions.className = 'ttt-match-actions';
 
         const isPlayerInMatch = (Ttt.matchId === m.matchId && Ttt.role === 'player');
 
-        if (!isPlayerInMatch && (!m.players.X || !m.players.O) && m.status === 'in_progress') {
+        if (!isPlayerInMatch && (!m.players.X || !m.players.O)) {
             const playBtn = document.createElement('button');
             playBtn.className = 'btn btn-sm btn-primary';
             playBtn.textContent = 'Play';
@@ -879,8 +730,6 @@ function tttRenderMatchList(matches) {
     });
 }
 
-/* ──────────────────────────────────────────────
-   INIT
-────────────────────────────────────────────── */
+/* ── init ── */
 switchMode('echo');
 setDisconnected('Not connected');
