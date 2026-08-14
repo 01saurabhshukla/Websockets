@@ -13,7 +13,12 @@
     <link
         href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
         rel="stylesheet" />
-    <link rel="stylesheet" href="client.css" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="theme-color" content="#17181A" />
+    <link rel="stylesheet" href="/css/client.css" />
 </head>
 
 <body>
@@ -25,15 +30,16 @@
                 <div class="logo-icon" aria-hidden="true">
                     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                         stroke-linecap="round">
-                        <path d="M5 12.55a11 11 0 0 1 14.08 0" />
-                        <path d="M1.42 9a16 16 0 0 1 21.16 0" />
-                        <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
-                        <circle cx="12" cy="20" r="1" fill="currentColor" />
+                        <path d="M12 12C9.9 8.325 5.4 8.325 5.4 12C5.4 15.675 9.9 15.675 12 12C14.1 8.325 18.6 8.325 18.6 12C18.6 15.675 14.1 15.675 12 12Z" />
+                        <circle cx="5.4" cy="12" r="1.95" style="fill: var(--ink)" />
+                        <circle cx="5.4" cy="12" r="1.4" fill="currentColor" stroke="none" />
+                        <circle cx="18.6" cy="12" r="1.95" style="fill: var(--ink)" />
+                        <circle cx="18.6" cy="12" r="1.4" fill="currentColor" stroke="none" />
                     </svg>
                 </div>
                 <div>
                     <h1>WebSocket Dev Client</h1>
-                    <span class="logo-sub">ws://127.0.0.1:4000 · RFC 6455</span>
+                    <span class="logo-sub">RFC 6455</span>
                 </div>
             </div>
 
@@ -102,7 +108,7 @@
                     <dl class="session-list">
                         <div class="session-row">
                             <dt>Endpoint</dt>
-                            <dd id="session-endpoint">ws://127.0.0.1:4000</dd>
+                            <dd id="session-endpoint">—</dd>
                         </div>
                         <div class="session-row">
                             <dt>Connection ID</dt>
@@ -297,7 +303,7 @@
 
     </div><!-- /#app -->
 
-    <script src="client.js"></script>
+    <script src="/js/client.js"></script>
     <script>
         /* One-time label — client.js updates the rest of the Session panel directly. */
         (function () {

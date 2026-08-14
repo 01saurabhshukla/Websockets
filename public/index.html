@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WebSocket Dev Client — a curiosity project</title>
+    <meta name="description" content="A hand-built WebSocket playground. Three demos exploring the protocol: raw echo, room broadcasting, and server-authoritative game state. Built out of curiosity, not for production." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="crossorigin" />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="theme-color" content="#17181A" />
+    <link rel="stylesheet" href="/css/home.css" />
+</head>
+
+<body>
+    <div class="wrap">
+
+        <header class="appbar">
+            <div class="logo">
+                <div class="logo-icon" aria-hidden="true">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                        <path d="M12 12C9.9 8.325 5.4 8.325 5.4 12C5.4 15.675 9.9 15.675 12 12C14.1 8.325 18.6 8.325 18.6 12C18.6 15.675 14.1 15.675 12 12Z" />
+                        <circle cx="5.4" cy="12" r="1.95" style="fill: var(--ink)" />
+                        <circle cx="5.4" cy="12" r="1.4" fill="currentColor" stroke="none" />
+                        <circle cx="18.6" cy="12" r="1.95" style="fill: var(--ink)" />
+                        <circle cx="18.6" cy="12" r="1.4" fill="currentColor" stroke="none" />
+                    </svg>
+                </div>
+                <div>
+                    <h1>WebSocket Dev Client</h1>
+                    <span class="logo-sub">a curiosity project · RFC 6455</span>
+                </div>
+            </div>
+            <div class="appbar-actions">
+                <a class="github-pill" href="https://github.com/01saurabhshukla/Websockets" target="_blank" rel="noopener noreferrer">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.269 2.75 1.026A9.564 9.564 0 0 1 12 6.844c.85.004 1.705.115 2.504.337 1.909-1.295 2.747-1.026 2.747-1.026.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .268.18.58.688.482A10.019 10.019 0 0 0 22 12.017C22 6.484 17.523 2 12 2z"/></svg>
+                    View source on GitHub
+                </a>
+                <div class="disclaimer-pill">Demo only — not production</div>
+            </div>
+        </header>
+
+        <section class="hero">
+            <span class="eyebrow">Read me first</span>
+            <h2>Everything here was built to <em>understand</em> WebSockets, not to ship them.</h2>
+            <p>
+                I wanted to know what actually happens on a WebSocket connection — how frames travel, how a
+                server fans one message out to many clients, and who gets to decide what's true when two
+                people act at once. So I built three small demos, each one answering a question I had.
+                It's deployed and live, so go ahead and play with it — just don't mistake it for a product.
+            </p>
+            <div class="hero-actions">
+                <a class="btn btn-primary" href="client.html">
+                    Open the client
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+                </a>
+                <a class="btn btn-ghost" href="#roadmap">What's next</a>
+            </div>
+        </section>
+
+        <div class="section-label"><span>Three questions, three demos</span></div>
+
+        <section class="features">
+            <article class="feature">
+                <div class="feature-head">
+                    <strong>Demo 01</strong>
+                    <span class="badge blue">Protocol</span>
+                </div>
+                <div class="feature-body">
+                    <h3>Echo</h3>
+                    <p>What does a frame actually look like going out and coming back? The plainest possible round trip, with nothing in the way.</p>
+                    <ul class="feature-list blue">
+                        <li>every frame logged, sent and received</li>
+                        <li>150 KB payload button to watch fragmentation</li>
+                        <li>live sent / received counters</li>
+                        <li>close codes shown verbatim</li>
+                    </ul>
+                </div>
+                <div class="feature-foot">
+                    <span class="badge">learned: framing, backpressure, close codes</span>
+                </div>
+            </article>
+
+            <article class="feature">
+                <div class="feature-head">
+                    <strong>Demo 02</strong>
+                    <span class="badge green">Fan-out</span>
+                </div>
+                <div class="feature-body">
+                    <h3>Rooms</h3>
+                    <p>How does one message reach many sockets? Rooms are just a map of names to connection sets — the interesting part is keeping it correct as people leave.</p>
+                    <ul class="feature-list green">
+                        <li>join and leave arbitrary rooms</li>
+                        <li>broadcast to every member at once</li>
+                        <li>direct messages to a single connection</li>
+                        <li>typing indicators with server timeouts</li>
+                    </ul>
+                </div>
+                <div class="feature-foot">
+                    <span class="badge">learned: fan-out, presence, cleanup on disconnect</span>
+                </div>
+            </article>
+
+            <article class="feature">
+                <div class="feature-head">
+                    <strong>Demo 03</strong>
+                    <span class="badge purple">State</span>
+                </div>
+                <div class="feature-body">
+                    <h3>Tic-Tac-Toe</h3>
+                    <p>Who decides what's true? The client never owns the board — it asks, the server rules, and everyone watching gets the same answer.</p>
+                    <ul class="feature-list purple">
+                        <li>server validates every single move</li>
+                        <li>play as X or O, or spectate live</li>
+                        <li>state pushed to players and spectators alike</li>
+                        <li>abandoned games handled on disconnect</li>
+                    </ul>
+                </div>
+                <div class="feature-foot">
+                    <span class="badge">learned: authoritative state, turn locking</span>
+                </div>
+            </article>
+        </section>
+
+        <div class="section-label"><span>Why it exists</span></div>
+
+        <section class="note">
+            <div class="note-main">
+                <h3>Built out of curiosity — that's the whole reason</h3>
+                <p>
+                    This is a portfolio project, not a product. Every feature exists because I got curious
+                    mid-way through the previous one. The echo demo made me wonder how broadcasting works;
+                    broadcasting made me wonder who arbitrates conflicting moves; that became the game.
+                </p>
+                <p>
+                    <strong>The UI is deliberately instrument-like</strong> — logs, counters, and raw frame
+                    contents on screen at all times — because the point was to see the protocol, not to hide
+                    it behind a pretty chat window.
+                </p>
+            </div>
+            <aside class="note-side">
+                <span class="field-label">At a glance</span>
+                <dl class="kv">
+                    <div class="kv-row"><dt>Purpose</dt><dd>learning</dd></div>
+                    <div class="kv-row"><dt>Demos</dt><dd>3</dd></div>
+                    <div class="kv-row"><dt>Auth</dt><dd>none</dd></div>
+                    <div class="kv-row"><dt>Persistence</dt><dd>in-memory</dd></div>
+                    <div class="kv-row"><dt>Heartbeat</dt><dd>ping / pong</dd></div>
+                    <div class="kv-row"><dt>Status</dt><dd>live demo</dd></div>
+                </dl>
+            </aside>
+        </section>
+
+        <div class="section-label" id="scope"><span>Being clear about scope</span></div>
+
+        <section class="honesty">
+            <div class="honesty-col yes">
+                <div class="feature-head"><strong>What it is</strong></div>
+                <ul>
+                    <li>A playground for watching WebSocket behaviour in real time</li>
+                    <li>Three self-contained demos, each answering one question</li>
+                    <li>Readable, deliberately un-clever code</li>
+                    <li>A heartbeat strategy — ping/pong keeps dead sockets from lingering</li>
+                    <li>Something to open in two browser tabs and poke at</li>
+                </ul>
+            </div>
+            <div class="honesty-col no">
+                <div class="feature-head"><strong>What it is not</strong></div>
+                <ul>
+                    <li>No authentication, authorisation, or rate limiting</li>
+                    <li>No database — all state dies with the server restart</li>
+                    <li>No input validation or abuse protection</li>
+                    <li>Fine to demo publicly; not something I'd put real users' data through</li>
+                </ul>
+            </div>
+        </section>
+
+        <div class="section-label"><span>Built with</span></div>
+
+        <div class="stack-row">
+            <span class="chip"><b>ws</b> · Node server</span>
+            <span class="chip"><b>vanilla JS</b> · no framework</span>
+            <span class="chip"><b>plain CSS</b> · no build step</span>
+            <span class="chip"><b>in-memory</b> · Map + Set</span>
+            <span class="chip"><b>JSON</b> · message envelope</span>
+            <span class="chip"><b>0</b> dependencies client-side</span>
+        </div>
+
+        <div class="section-label" id="roadmap"><span>What I want to build next</span></div>
+
+        <section class="roadmap">
+            <article class="road-item">
+                <div class="road-top">
+                    <h4>Reconnection with message replay</h4>
+                    <span class="badge blue">next up</span>
+                </div>
+                <p>Drop the Wi-Fi mid-game and pick up where you left off — exponential backoff on the client, a short buffer of missed frames on the server.</p>
+            </article>
+
+            <article class="road-item">
+                <div class="road-top">
+                    <h4>Binary frames</h4>
+                    <span class="badge blue">next up</span>
+                </div>
+                <p>Send an image or an audio blob instead of text, and see how binary frames differ from the JSON envelope everything currently uses.</p>
+            </article>
+
+            <article class="road-item">
+                <div class="road-top">
+                    <h4>Redis-backed rooms</h4>
+                    <span class="badge">exploring</span>
+                </div>
+                <p>Right now rooms live in one process's memory. Pub/sub would let two server instances share the same room — the real answer to "how does this scale?"</p>
+            </article>
+
+            <article class="road-item">
+                <div class="road-top">
+                    <h4>Schema validation on every message</h4>
+                    <span class="badge">exploring</span>
+                </div>
+                <p>A single validated envelope shape, rejected at the door instead of trusted. The obvious gap in the current build, and the one I most want to close.</p>
+            </article>
+
+            <article class="road-item">
+                <div class="road-top">
+                    <h4>A latency inspector</h4>
+                    <span class="badge">idea</span>
+                </div>
+                <p>Round-trip time per frame, charted live. Mostly because I'd like to see what a slow connection actually looks like.</p>
+            </article>
+
+            <article class="road-item">
+                <div class="road-top">
+                    <h4>Optimistic UI on the game</h4>
+                    <span class="badge">idea</span>
+                </div>
+                <p>Paint the move instantly, roll it back if the server disagrees — the thing every real-time app does, and the next question my curiosity is heading toward.</p>
+            </article>
+        </section>
+
+        <div class="section-label"><span>Credit where it's due</span></div>
+
+        <section class="credit">
+            <div class="credit-mark" aria-hidden="true">MC</div>
+            <div class="credit-body">
+                <h4>Learned the fundamentals from Matthew Clyde</h4>
+                <p>
+                    The groundwork here came from Matthew Clyde's WebSocket tutorial — genuinely excellent
+                    teaching that made the protocol click. The three demos and everything above are where my
+                    own curiosity took it from there.
+                </p>
+            </div>
+        </section>
+
+        <footer class="foot">
+            <p>Open the client in two tabs to see broadcasting work.</p>
+            <a class="btn btn-primary" href="client.html">
+                Open the client
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+            </a>
+        </footer>
+
+    </div>
+</body>
+
+</html>

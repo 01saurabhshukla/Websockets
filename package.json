@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server/app.js",
     "dev": "node --watch server/app.js",
-    "client": "npx http-server -p 8000",
+    "client": "npx http-server public -p 8000",
     "test": "node --test server/tests/*.test.js",
     "prepare": "git config core.hooksPath .githooks"
   },
