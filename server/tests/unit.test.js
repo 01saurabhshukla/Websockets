@@ -8,8 +8,8 @@ describe('WebSocket Upgrade Unit Tests', () => {
     describe('isOriginAllowed()', () => {
         test('should allow valid origins specified in constants', () => {
             assert.strictEqual(UTILITIES.isOriginAllowed('http://127.0.0.1:8000'), true);
-            assert.strictEqual(UTILITIES.isOriginAllowed('http://localhost:5500'), true);
-            assert.strictEqual(UTILITIES.isOriginAllowed('null'), true);
+            assert.strictEqual(UTILITIES.isOriginAllowed('http://localhost:5500'), false);
+            assert.strictEqual(UTILITIES.isOriginAllowed('null'), false);
         });
 
         test('should reject unauthorized origins', () => {

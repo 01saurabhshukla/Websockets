@@ -17,14 +17,14 @@ module.exports = {
     VERSION: 13,
     CONNECTION: "upgrade",
     UPGRADE: "websocket",
-    ALLOWED_ORIGINS: [
-        'http://localhost:5500',
-        'http://127.0.0.1:5500',
-        'http://127.0.0.1:8000',
-        'http://localhost:8000',
-        'http://192.168.1.58:8000',  // LAN access from other devices on the same network
-        'null'
-    ],
+    ALLOWED_ORIGINS:
+        process.env.ALLOWED_ORIGINS
+        ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+        : [
+            'http://127.0.0.1:8000',
+            'http://localhost:8000',
+        ]
+    ,
     GUID: "258EAFA5-E914-47DA-95CA-C5AB0DC85B11",
 
     // Frame Parsing

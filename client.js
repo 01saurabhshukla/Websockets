@@ -1,6 +1,6 @@
 'use strict';
 
-const WS_URL = `ws://${window.location.hostname}:4000`;
+const WS_URL = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
 
 let socket = null;
 let currentMode = 'echo';
