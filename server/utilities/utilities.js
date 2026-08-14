@@ -1,15 +1,10 @@
 const CONSTANTS = require('../config/constants');
 const crypto = require('crypto');
-
-// function isOriginAllowed(origin){
-//     return CONSTANTS.ALLOWED_ORIGINS.includes(origin);
-// }
+const Logger = require('../logger/Logger');
 
 function isOriginAllowed(origin){
-    if (CONSTANTS.ALLOWED_ORIGINS.includes('*')) return true;
     return CONSTANTS.ALLOWED_ORIGINS.includes(origin);
 }
-
 
 function check(socket, upgradeHeaderCheck, connectionHeaderCheck, methodCheck, originCheck) {
     if(upgradeHeaderCheck && connectionHeaderCheck && methodCheck && originCheck) {
@@ -22,6 +17,8 @@ function check(socket, upgradeHeaderCheck, connectionHeaderCheck, methodCheck, o
         `Content-Length: ${messageLength}\r\n` + 
         `\r\n` +
         message;
+        
+        Logger.warn('Upgrade rejected', { upgradeHeaderCheck, connectionHeaderCheck, methodCheck, originCheck });
         socket.write(response); // access our socket object, and send back a HTTP response
         socket.end(); // this will close the TCP connection and keep the server running
     };
